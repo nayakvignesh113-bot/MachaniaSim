@@ -1,0 +1,13 @@
+{
+  "name": "machinasim",
+  "version": "0.1.0",
+  "description": "MachinaSim — browser-based conventional machining simulation and research platform",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "serve": "python3 -m http.server 8080",
+    "docs": "node scripts/gen-docs.mjs"
+  },
+  "license": "MIT"
+}
