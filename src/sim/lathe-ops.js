@@ -41,6 +41,7 @@ export function planLatheOp(op, p, wp, outline) {
   const moves = [];
   const warnings = [];
   const zOff = outline ? -outline.zmin : 0; // ref-z so that leftmost tool point sits at the target
+  const zApp = L + CLR + Math.max(0, zOff); // approach plane: the whole tool outline clears the end face
   const feed = (z, r, extra = {}) => moves.push({ kind: 'feed', z, r, f: p.f, N: p.N, ...extra });
   const rapid = (z, r) => moves.push({ kind: 'rapid', z, r });
   switch (op) {
@@ -56,8 +57,8 @@ export function planLatheOp(op, p, wp, outline) {
         if (Rt >= R0) { warnings.push(`Target Ø${st.D} ≥ current Ø${(2 * R0).toFixed(2)} — no material to remove.`); continue; }
         for (const depth of passes(R0 - Rt, p.ap)) {
           const r = R0 - depth;
-          rapid(L + CLR, R0 + CLR);
-          rapid(L + CLR, r);
+          rapid(zApp, R0 + CLR);
+          rapid(zApp, r);
           feed(zStop, r);
           feed(zStop + 0.5, r + 0.5); // 45° pull-off at feed
           rapid(zStop + 0.5, R0 + CLR);
@@ -94,7 +95,8 @@ export function planLatheOp(op, p, wp, outline) {
       for (const depth of passes(maxDepth, p.ap)) {
         const off = maxDepth - depth;
         // line r(z) = rS + off + slope·(z1 − z), extended to the approach point
-        const zs = z1 + CLR, rs = rS + off - slope * CLR;
+        const ext = CLR + Math.max(0, zOff);
+        const zs = z1 + ext, rs = rS + off - slope * ext;
         const ze = z2 + zOff, re = rS + off + slope * (z1 - z2);
         rapid(zs, R0 + CLR); rapid(zs, rs);
         feed(ze, re);
@@ -105,8 +107,9 @@ export function planLatheOp(op, p, wp, outline) {
     case 'chamfer': {
       const R0 = wp.outerAt(L - 0.05) ?? wp.R[wp.n - 1];
       const c = p.c;
-      // tip follows r = (R0 − c) + (L − z); extend 1 mm beyond both ends
-      rapid(L + 1, R0 + CLR); rapid(L + 1, R0 - c - 1);
+      // tip follows r = (R0 − c) + (L − z); start far enough along the 45° line that the outline clears the end face
+      const e = Math.min(1 + Math.max(0, zOff), Math.max(0, R0 - c - 0.5));
+      rapid(L + CLR + Math.max(0, zOff), R0 + CLR); rapid(L + e, R0 - c - e);
       feed(L - c - 0.5, R0 + 0.5);
       rapid(L + CLR, R0 + CLR);
       return { moves, warnings, summary: `${c} × 45° chamfer` };
@@ -167,7 +170,7 @@ export function planLatheOp(op, p, wp, outline) {
       const base = Math.max(Ribot, 0);
       for (const depth of passes(Rt - base, p.ap)) {
         const r = base + depth;
-        rapid(L + CLR, Math.max(base - 1, 0)); rapid(L + CLR, r);
+        rapid(zApp, Math.max(base - 1, 0)); rapid(zApp, r);
         feed(zEnd + zOff, r);
         feed(zEnd + zOff + 0.5, r - 0.5);
         rapid(L + CLR, r - 0.5);

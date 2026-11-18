@@ -73,8 +73,9 @@ export function forcesFromEngagement({ mat, tool, eng, N, VB = 0, land = null })
   const Fp = r.Fth * eng.nr; // radial component on tool (+r outward)
   const Vm = (2 * Math.PI * eng.rMean * N) / 1000;
   const torque = (r.Fc * eng.rMean) / 1000;
+  const R = Math.hypot(r.Fc, Ff, Fp);
   return {
-    ...r, Ff, Fp, R: Math.hypot(r.Fc, Ff, Fp), Vm, torque,
+    ...r, Ff, Fp, R, F: R, Vm, torque,
     power: (r.Fc * Vm) / 60000,
     mrr: 2 * Math.PI * eng.rMean * eng.A * N, // Pappus: V = 2π r̄ A per rev
   };

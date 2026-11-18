@@ -22,5 +22,5 @@
 - Threads are single-start, constant pitch; the helical rendering maps the θ = 0 section.
 
 ## Software
-- Storage is per browser (localStorage, ~5 MB); use Export for large projects. Unit-system switching converts the lathe inputs and all results; some inputs on other pages are metric-only.
+- Storage is per browser (localStorage, ~5 MB); use Export for large projects. Unit-system switching converts the lathe inputs and the live readouts; charts, exports and most inputs on other pages stay in SI/metric units.
 - WebGL is required for 3-D views (simulations and results still run without it).
