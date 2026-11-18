@@ -6,7 +6,8 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "serve": "python3 -m http.server 8080"
+    "serve": "python3 -m http.server 8080",
+    "docs": "node scripts/gen-docs.mjs"
   },
   "license": "MIT"
 }

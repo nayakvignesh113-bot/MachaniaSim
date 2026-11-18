@@ -60,6 +60,8 @@ export class ResearchPage {
     const d = this.s.data;
     if (!d.rows.length) { toast('No data rows found', 'error'); return; }
     const guess = (re) => d.headers.find((x) => re.test(x)) || '';
+    const roleCol = guess(/role|set|split/i);
+    if (roleCol) this.s.role = 'column';
     this.s.map = { V: guess(/^v(c)?\b|speed/i), f: guess(/^f\b|feed/i), ap: guess(/^ap|depth/i), D: guess(/^d\b|^d_|diam/i), Fc: guess(/fc|cutting.?force|^fz?_?t/i), Ff: guess(/ff|feed.?force/i), Fp: guess(/fp|passive|radial/i), Ra: guess(/^ra/i), T: guess(/^t\b|life/i), role: guess(/role|set|split/i) };
     this.dataInfo.replaceChildren(h('div', { class: 'muted' }, `${this.s.fileName}: ${d.rows.length} rows, ${d.headers.length} columns`), h('div', { class: 'scroll' }, table(d.headers, d.rows.slice(0, 50).map((r) => d.headers.map((k) => r[k])))));
     const opts = [{ value: '', label: '— not available —' }, ...d.headers.map((x) => ({ value: x, label: x }))];
@@ -106,7 +108,7 @@ export class ResearchPage {
       out.push(['Ra (theoretical vs measured)', ok.length, fmt(m.MAE, 4), fmt(m.RMSE, 4), fmt(m.MAPE, 3) + ' %', fmt(m.R2, 3), 'theory is a lower bound']);
     }
     const all = series.flatMap((s) => [...s.x, ...s.y]);
-    const lo = Math.min(...all, 0), hi = Math.max(...all, 1);
+    const lo = Math.min(...all, 0), hi = Math.max(...all, 1) * 1.06;
     series.push({ name: '1 : 1', x: [lo, hi], y: [lo, hi], color: '#9ca3af', dash: [4, 4] });
     this.cScatter.setData(series, { xMin: lo, xMax: hi, yMin: lo, yMax: hi });
     // calibration

@@ -62,6 +62,7 @@ export class MillPage {
     this.ro = readouts(); this.alerts = alertsBox();
     this.cRev = new Chart({ title: 'Forces over one revolution (last cut)', xLabel: 'Cutter rotation angle (deg)', yLabel: 'Force (N)' });
     this.cTooth = new Chart({ title: 'Tangential force per tooth (last cut)', xLabel: 'Cutter rotation angle (deg)', yLabel: 'Ft per tooth (N)' });
+    this.cH = new Chart({ title: 'Instantaneous uncut chip thickness per tooth (engaged only)', xLabel: 'Cutter rotation angle (deg)', yLabel: 'h (mm)' });
     this.cT = new Chart({ title: 'Mean forces vs time', xLabel: 'Time (s)', yLabel: 'Mean force (N)' });
     this.cP = new Chart({ title: 'Power and MRR', xLabel: 'Time (s)', yLabel: 'Power (kW)', y2Label: 'MRR (cm³/min)' });
     this.cVB = new Chart({ title: 'Flank wear per tooth', xLabel: 'Tooth', yLabel: 'VB (mm)', type: 'bar' });
@@ -79,7 +80,7 @@ export class MillPage {
     this.qual = h('div');
     this.tabs = tabs([
       { id: 'live', label: 'Live', content: h('div', {}, this.ro, this.alerts) },
-      { id: 'rev', label: 'Per revolution', content: h('div', {}, this.cRev.el, this.cTooth.el, modelNote(['M-MILL-01', 'M-MILL-02'])) },
+      { id: 'rev', label: 'Per revolution', content: h('div', {}, this.cRev.el, this.cTooth.el, this.cH.el, modelNote(['M-MILL-01', 'M-MILL-02'])) },
       { id: 'graphs', label: 'Graphs', content: h('div', {}, this.cT.el, this.cP.el, this.cVB.el) },
       { id: 'thermal', label: 'Thermal', content: h('div', {}, this.cCyc.el, this.fieldCanvas, this.thInfo) },
       { id: 'dyn', label: 'Dynamics', content: dyn },
@@ -219,6 +220,7 @@ export class MillPage {
     this.cRev.setData([{ name: 'Fx', x: S.phi, y: S.Fx, color: '#2563eb' }, { name: 'Fy', x: S.phi, y: S.Fy, color: '#059669' }, { name: 'Fz', x: S.phi, y: S.Fz, color: '#dc2626' }], { xMin: 0, xMax: 360 });
     const Z = this.s.tool.z;
     this.cTooth.setData(Array.from({ length: Z }, (_, j) => ({ name: `tooth ${j + 1}`, x: S.phi, y: S.perTooth.map((pt) => pt[j]) })), { xMin: 0, xMax: 360 });
+    this.cH.setData(Array.from({ length: Z }, (_, j) => ({ name: `tooth ${j + 1}`, x: S.phi, y: S.hTooth.map((ht, k) => (S.perTooth[k][j] > 0 ? ht[j] : NaN)) })), { xMin: 0, xMax: 360, zeroY: true });
   }
   _charts() {
     const H = this.sim.hist;

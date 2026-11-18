@@ -107,7 +107,7 @@ export class MillSim {
     const n = this.nPhi;
     let sx = 0, sy = 0, sz = 0, sT = 0, peak = 0, eng = 0;
     const toothEngaged = new Array(Z).fill(0);
-    const series = { phi: [], Fx: [], Fy: [], Fz: [], T: [], perTooth: [] };
+    const series = { phi: [], Fx: [], Fy: [], Fz: [], T: [], perTooth: [], hTooth: [] };
     for (let k = 0; k < n; k++) {
       const phi = (2 * Math.PI * k) / n;
       const r = millingForcesAt(phi, o, els);
@@ -118,7 +118,7 @@ export class MillSim {
       sx += Fx; sy += Fy; sz += Fz; sT += r.T; peak = Math.max(peak, Math.hypot(Fx, Fy, Fz));
       if (r.T > 0) eng++;
       r.perTooth.forEach((v, j) => { if (v > 0) toothEngaged[j] += 1 / n; });
-      series.phi.push((phi * 180) / Math.PI); series.Fx.push(Fx); series.Fy.push(Fy); series.Fz.push(Fz); series.T.push(r.T); series.perTooth.push(r.perTooth);
+      series.phi.push((phi * 180) / Math.PI); series.Fx.push(Fx); series.Fy.push(Fy); series.Fz.push(Fz); series.T.push(r.T); series.perTooth.push(r.perTooth); series.hTooth.push(r.hTooth);
     }
     return { mean: { Fx: sx / n, Fy: sy / n, Fz: sz / n, T: sT / n }, Fpeak: peak, engagedFrac: eng / n, toothEngaged, series, frame: fr };
   }
