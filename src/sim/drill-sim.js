@@ -30,7 +30,9 @@ export class DrillSim {
   constructor({ zmap, mat, tool, toolMat, wear, land, machine = RADIAL_DRILL }) {
     Object.assign(this, { zmap, mat, tool, toolMat, machine });
     this.land = land || defaultWearLand(mat);
-    this.wear = wear || new EdgeWear({ taylor: null });
+    // independent wear state for each cutting lip; chisel-edge wear is a user-set condition (no predictive model)
+    this.lipWear = Array.isArray(wear) ? wear : [wear || new EdgeWear({ taylor: null }), new EdgeWear({ taylor: wear?.taylor ?? null, VB0: wear?.VB ?? 0 })];
+    this.VBchisel = 0;
     this.moves = []; this.mi = 0; this.time = 0;
     this.pos = { x: 0, y: 0, z: zmap.H0 + 30 };
     this.hist = { t: [], depth: [], thrust: [], torque: [], P: [], mrr: [], VB: [], op: [], hole: [] };
@@ -78,7 +80,7 @@ export class DrillSim {
         }
         return hit / angles;
       };
-      const fr = drillForces({ mat: this.mat, tool, f, N, engaged, VB: [this.wear.VB, this.wear.VB], land: this.land });
+      const fr = drillForces({ mat: this.mat, tool, f, N, engaged, VB: this.lipWear.map((w) => w.VB), VBchisel: this.VBchisel, land: this.land });
       const R = tool.D / 2;
       const vol = zm.stamp(verticalToolBottom(tool, np.x, np.y, np.z), np.x - R, np.x + R, np.y - R, np.y + R);
       this.removed += vol;
@@ -91,11 +93,13 @@ export class DrillSim {
     }
     this.pos = np; this.time += dt;
     if (d - ds < 1e-9) { this.mi++; if (m.endHole) this._registerHole(m); }
-    if (res.cutting) this.wear.advance(dt, { V: (Math.PI * tool.D * N) / 1000, f, ap: tool.D / 2 });
-    const s = { ...res, t: this.time, x: np.x, y: np.y, z: np.z, depth: zm.H0 - np.z, VB: this.wear.VB, op: m.op, N, f };
+    if (res.cutting) for (const w of this.lipWear) w.advance(dt, { V: (Math.PI * tool.D * N) / 1000, f, ap: tool.D / 2 });
+    const VB = Math.max(...this.lipWear.map((w) => w.VB));
+    const s = { ...res, t: this.time, x: np.x, y: np.y, z: np.z, depth: zm.H0 - np.z, VB, VBlips: this.lipWear.map((w) => w.VB), op: m.op, N, f };
     const H = this.hist;
     H.t.push(s.t); H.depth.push(s.depth); H.thrust.push(s.thrust || 0); H.torque.push(s.torque || 0); H.P.push(s.power || 0); H.mrr.push(s.mrr || 0); H.VB.push(s.VB); H.op.push(s.op); H.hole.push(m.hole ?? 0);
     this.last = s;
+    if (s.cutting) this.lastCut = s;
     if (this.machine && s.power > this.machine.Pmax) this.events.push({ t: this.time, level: 'warning', msg: `Power ${s.power.toFixed(2)} kW exceeds ${this.machine.Pmax} kW` });
     return s;
   }

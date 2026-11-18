@@ -85,6 +85,7 @@ export class LatheSim {
     } else sample.defl = 0;
     this._record(sample);
     this.last = sample;
+    if (res.cutting) this.lastCut = sample;
     this.alerts = assessCondition({ VB: this.wear.VB, T: sample.Tint, F: res.F, P: res.power }, this.limits || { VB: ISO3685.VB });
     return sample;
   }

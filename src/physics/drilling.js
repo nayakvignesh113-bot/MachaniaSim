@@ -12,7 +12,9 @@
 import { DEG } from '../core/units.js';
 import { kienzleKc, rakeFactor, thrustRatio, wearLandForces, defaultWearLand } from './cutting.js';
 
-export const CHISEL_DEFAULTS = { rake: -56, maxThrustRatio: 2.0, status: 'estimated' };
+// ESTIMATED: chosen so that the chisel edge carries roughly half to three-quarters of the thrust of a
+// conventional twist drill, the range commonly reported for chisel-edge contributions. Calibrate.
+export const CHISEL_DEFAULTS = { rake: -56, maxThrustRatio: 1.0, status: 'estimated' };
 
 /**
  * @param o.mat material params; o.tool drill {D, pointAngle, helix, webRatio}

@@ -43,7 +43,11 @@ export function cuttingTemperature({ mat, Fc, Fth, gamma, V, h, b, T0 = 20, cont
   const dTf = m.Pf / mdotc; // mean chip temperature rise from secondary zone
   const l0 = contactFactor; // l/hc
   const dTm = 1.13 * Math.sqrt(RT / l0) * dTf; // Boothroyd max rake-face rise
+  const TrakeMax = T0 + dTs + dTm;
+  const warnings = [];
+  if (mat.Tm && TrakeMax > 0.8 * mat.Tm) warnings.push(`Estimated rake-face temperature (${TrakeMax.toFixed(0)} °C) exceeds 80 % of the workpiece melting point: outside the validity of this reduced-order model (no thermal softening, constant properties). Real interface temperatures saturate below the solidus — treat as an upper-bound indicator only.`);
   return {
+    warnings,
     ...m, RT, Gamma: G,
     Tshear: T0 + dTs,
     TchipMean: T0 + dTs + dTf,

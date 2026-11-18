@@ -63,7 +63,7 @@ export class MillSim {
     const H = this.hist;
     H.t.push(s.t); H.Fx.push(s.Fx); H.Fy.push(s.Fy); H.Fz.push(s.Fz); H.F.push(s.F); H.T.push(s.T); H.P.push(s.P); H.mrr.push(s.mrr); H.VBmax.push(s.VBmax); H.op.push(s.op);
     if (H.t.length > 40000) for (const k of Object.keys(H)) H[k] = H[k].filter((_, i) => i % 2 === 0);
-    if (cutting) this.lastCycle = cyc;
+    if (cutting) { this.lastCycle = cyc; this.lastCut = s; }
     if (this.machine && s.P > this.machine.Pmax) this.events.push({ t: this.time, level: 'warning', msg: `Power ${s.P.toFixed(2)} kW exceeds ${this.machine.Pmax} kW` });
     this.last = s;
     return s;
