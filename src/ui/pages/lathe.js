@@ -306,7 +306,7 @@ export class LathePage {
     this.alerts.update(this.sim.alerts, this.sim.events);
     this.warnBox.replaceChildren(...[...(L?.warnings || []), ...(L?.thermal?.warnings || [])].map((x) => h('div', { class: 'warn' }, x)));
     const cutNow = this.sim.last?.cutting;
-    this.overlay.textContent = cutNow ? `${LATHE_OPS[L.op]?.name || ''}  Fc ${fmt(L.Fc, 4)} N · P ${fmt(L.power, 3)} kW · VB ${fmt(w.VB, 3)} mm` : this.sim.done ? (L ? 'Idle — readouts show the last cutting revolution' : 'Idle') : 'Positioning';
+    this.overlay.textContent = cutNow ? `${LATHE_OPS[L.op]?.name || ''}  Fc ${fmt(L.Fc, 4)} N · P ${fmt(L.power, 3)} kW · VB ${fmt(w.VB, 3)} mm` : this.sim.done ? (L ? 'Idle (last cut shown)' : 'Idle') : 'Positioning';
   }
 
   _xData() {
