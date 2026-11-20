@@ -12,7 +12,7 @@ import { taylorLife } from '../../physics/wear.js';
 import { cuttingTemperature } from '../../physics/thermal.js';
 import { DEG } from '../../core/units.js';
 
-async function readTable(file) {
+export async function readTable(file) {
   const name = file.name.toLowerCase();
   if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
     if (!window.XLSX) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'vendor/xlsx.mini.min.js'; s.onload = res; s.onerror = () => rej(new Error('Could not load XLSX reader')); document.head.append(s); });

@@ -138,7 +138,8 @@ export class ToolThermal {
    */
   stepCutting(dt, c, active = true) {
     if (!active || !c || !(c.Pf > 0)) { this.T = this._adi(this.T, dt, 0, 0, 0, 0); this.time += dt; this.last = null; return null; }
-    const lc = c.lc / 1000, b = c.b / 1000, lw = c.Pw > 0 && c.VB > 0 ? c.VB / 1000 : 0;
+    // a flank land narrower than 0.02 mm carries negligible heat and cannot be resolved: treated as absent
+    const lc = c.lc / 1000, b = c.b / 1000, lw = c.Pw > 0 && c.VB >= 0.02 ? c.VB / 1000 : 0;
     const qf = c.Pf / (lc * b);
     const qw = lw > 0 ? c.Pw / (lw * b) : 0;
     const kc_ = bandSourceKappa(c.chip.k, c.chip.alpha, lc, c.Vch / 60);

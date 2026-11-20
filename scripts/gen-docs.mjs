@@ -41,6 +41,11 @@ vr += [
   'Tlusty minimum stability limit equals 2kζ(1+ζ)/Ks within 0.2 %; Altintas–Budak directional factors equal numerical integrals (physics.test.js).',
   'Kienzle, Taylor and extended-Taylor calibration recover known constants from synthetic data exactly (research.test.js).',
   'ToolVision measures a synthetic wear land within 3 % (mean) and ±2 px (max) (research.test.js).',
+  'V2: JC softening factor is exactly 1 at the kc reference and < 1 at higher speed; Lee–Shaffer energy balance; edge-force and wear-progression calibration recover constants (lathe-v2-mech.test.js).',
+  'V2: ADI thermal scheme conserves energy to round-off; constant-flux surface temperature within 2 % of 2q√(αt/π)/k; chip-/tool-side interface temperatures equal within 0.5 K (lathe-v2-thermal.test.js).',
+  'V2: Weibull chipping survival at t = η equals e^−1 within 4 % (3000 edges); crater lowers Fc; nose wear sets recession (lathe-v2-wear.test.js).',
+  'V2: deflection feedback reproduces the cantilever oversize 2·Fp·z³/(3EI) within 10 % (lathe-v2-wear.test.js).',
+  'V2: time-domain chatter is stable at 0.7·b_lim and unstable at 1.4·b_lim of the Tlusty envelope at two speeds (lathe-v2-dyn.test.js).',
 ].map((x) => `- ${x}`).join('\n') + '\n\n## Data provenance summary\n\n| Material | kc1.1 / mc status | Physical properties | Johnson–Cook |\n|---|---|---|---|\n' +
   MATERIALS.map((m) => `| ${m.name} | ${m.kienzle.kc11.status} / ${m.kienzle.mc.status} | ${[...new Set(Object.values(m.props).map((p) => p.status))].join(', ')} | ${m.jc ? m.jc.status : '—'} |`).join('\n') +
   '\n\n| Tool material | Property status | Taylor defaults |\n|---|---|---|\n' + TOOL_MATERIALS.map((t) => `| ${t.name} | ${[...new Set(Object.values(t.props).map((p) => p.status))].join(', ')} | ${t.taylor.steel ? `steel n=${t.taylor.steel.n}, C=${t.taylor.steel.C}` : 'steel: none'}; ${t.taylor.nonSteel ? `non-steel n=${t.taylor.nonSteel.n}, C=${t.taylor.nonSteel.C}` : 'non-steel: none'} |`).join('\n') + '\n';

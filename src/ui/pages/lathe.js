@@ -367,7 +367,7 @@ export class LathePage {
     rows.push(['Tool-nose recession (VB·tanα)', `${fmt(this.sim.wear.radialWear * 1000, 3)} µm → Ø error ≈ +${fmt(2000 * this.sim.wear.radialWear, 3)} µm`]);
     if (wp.partedAt != null) rows.push(['Parted off at z', `${fmt(wp.partedAt, 5)} mm`]);
     wp.threads.forEach((th) => rows.push(['Thread', `P = ${th.pitch} mm over z = ${fmt(th.z1, 4)}–${fmt(th.z2, 4)} mm, H1 = ${fmt(th.depth, 4)} mm`]));
-    this.qualInfo.replaceChildren(kv(rows), h('div', { class: 'note' }, 'Geometric roughness is the ideal kinematic surface produced by the simulated tool outline; actual roughness also depends on BUE, vibration, side flow and wear and must be calibrated experimentally. Deflection is reported but not fed back into the geometry (stated limitation).'));
+    this.qualInfo.replaceChildren(kv(rows), h('div', { class: 'note' }, 'Geometric roughness is the ideal kinematic surface produced by the simulated tool outline; actual roughness also depends on BUE, vibration, side flow and wear and must be calibrated experimentally. Deflection is fed back into the machined geometry when “Feed static deflection back” is enabled (Model options); dynamic vibration enters the predicted profile through the time-domain run (Dynamics).'));
   }
   _lobes() {
     const s = this.s, m = this.mat;

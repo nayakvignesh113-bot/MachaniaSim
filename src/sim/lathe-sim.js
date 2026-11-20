@@ -159,7 +159,7 @@ export class LatheSim {
     const fr = forcesFromEngagement({ mat: this.mat, tool: { ...this.tool, rake: rakeEff }, eng: { A, l: eng.l, nz: eng.nz, nr: eng.nr, rMean: st.rMean }, N: m.N, VB: this.wear.VB, land: this.land, opts: { softening: this.opts.softening, shearModel: this.opts.shearModel, edge: this.opts.edge } });
     fr.rakeEff = rakeEff;
     if (this.machine && fr.power > this.machine.Pmax) this.events.push({ t: this.time, level: 'warning', msg: `Cutting power ${fr.power.toFixed(2)} kW exceeds machine rating ${this.machine.Pmax} kW` });
-    return { cutting: true, ...fr, A, l: eng.l, rMean: st.rMean, ap: A / m.f };
+    return { cutting: true, ...fr, A, l: eng.l, nz: eng.nz, nr: eng.nr, rMean: st.rMean, ap: A / m.f };
   }
 
   _drillRev(np, m, frac) {
@@ -184,7 +184,7 @@ export class LatheSim {
     const H = this.hist;
     H.t.push(s.t); H.z.push(s.z); H.r.push(s.r); H.Fc.push(s.Fc || 0); H.Ff.push(s.Ff || 0); H.Fp.push(s.Fp || 0); H.F.push(s.F || 0);
     H.T.push(s.torque || 0); H.P.push(s.power || 0); H.mrr.push(s.mrr || 0); H.h.push(s.h || 0); H.VB.push(s.VB); H.Tint.push(s.Tint); H.Tshear.push(s.Tshear); H.defl.push(s.defl || 0); H.op.push(s.op);
-    H.Trake.push(s.Trake); H.Ttool.push(s.toolTmax); H.R.push(s.R); H.KT.push(s.KT || 0); H.VC.push(s.VC || 0); H.VN.push(s.VN || 0); H.Ksoft.push(s.Ksoft ?? 1);
+    H.Trake.push(s.Trake); H.Ttool.push(s.toolTmax); (H.Tprobe ||= []).push(this.opts.probe ? this.thermal.at(this.opts.probe.x, this.opts.probe.y) : null); (H.cutT ||= []).push(this.wear.cutTime); H.R.push(s.R); H.KT.push(s.KT || 0); H.VC.push(s.VC || 0); H.VN.push(s.VN || 0); H.Ksoft.push(s.Ksoft ?? 1);
     if (H.t.length > 40000) for (const k of Object.keys(H)) H[k] = H[k].filter((_, i) => i % 2 === 0);
   }
 

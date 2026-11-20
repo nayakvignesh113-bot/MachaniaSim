@@ -1,4 +1,6 @@
-# Known limitations (v1.0.0)
+# Known limitations (v1.1.0)
+
+Lathe V2 changes several items below; see LATHE_V2.md for the per-subsystem record.
 
 ## Data
 - Kienzle kc1.1/mc are VDI 3323 *group* values from a tool maker; real grades and heat-treatment states differ. Calibrate (Research → Experiments).
@@ -7,11 +9,11 @@
 - The Merchant-type thrust ratio tan(β − γ) becomes zero for high positive rake (e.g. drill lip periphery), which under-predicts lip thrust; calibrate μ.
 
 ## Physics not (yet) modelled
-- Crater (Usui interface only, not in UI), notch, nose wear, BUE, plastic deformation, thermal cracking and fracture prediction. Flank-wear progression is linear (Taylor–Miner); break-in/accelerated stages are not predicted.
+- Lathe: nose, notch, crater and chipping models exist but need user coefficients (reported as “not predicted” otherwise). Flank progression is linear unless calibrated (power law). BUE and quantitative plastic deformation are not modelled; thermal cracking is not modelled.
 - Wear effect on surface roughness; side flow; ploughing at very small chip thickness (Kienzle is extrapolated below 0.05 mm with a warning).
-- Thermal softening: forces are temperature-independent; analytical temperatures can exceed physical limits at high speed (a warning is shown above 80 % of the melting point).
+- Thermal softening (lathe): primary-zone Johnson–Cook correction only, relative to an assumed kc reference condition; the effect is small for steels. Boothroyd temperatures can exceed physical limits at high speed (warning above 80 % of melting). The conjugate tool model is 2-D (upper-bound tool temperatures).
 - No FD/FE solution of the workpiece or chip temperature field; no FEM chip formation; no geometric 3-D chip visualisation (chip mechanics are analytical: shear angle, chip ratio, contact length).
-- Structural deflection and vibration are reported but not fed back into the machined geometry; no time-domain chatter simulation.
+- Lathe: static deflection is fed back into the geometry (optional); time-domain chatter is evaluated at an operating point and imprinted on the predicted profile, not continuously along the toolpath. Milling/drilling deflection is still not fed back.
 - Residual stress is not predicted (no suitable validated model implemented).
 - Milling plunge (end-cutting-edge) forces; tapping thread geometry in the Z-map; drill web-thinning rake.
 - Grinding: no size effect on u, wheel loading or glazing; grinding/shaping/sawing/broaching views are 2-D schematics.

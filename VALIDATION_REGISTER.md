@@ -1,6 +1,6 @@
 # MachinaSim — Verification & validation register
 
-_Generated from `src/core/models.js` (v1.0.0)._
+_Generated from `src/core/models.js` (v1.1.0)._
 
 Status vocabulary (specification §23): **Implemented, unvalidated** · **Verified against analytical benchmarks** (the code reproduces an equation or an independent analytical/numerical solution in the automated tests) · **Calibrated against experimental data** · **Independently validated** · **Limited / experimental**.
 
@@ -16,6 +16,18 @@ Status vocabulary (specification §23): **Implemented, unvalidated** · **Verifi
 | M-TURN-02 | Geometry-coupled turning forces (equivalent chip thickness) | Verified against analytical benchmarks | lathe.test.js › Straight turning sharp 90° tool | Any outline / path (turning, facing, grooving, threading, taper, chamfer) |
 | M-TURN-03 | Kinematic surface roughness | Verified against analytical benchmarks | lathe.test.js › Turned profile roughness | Theoretical lower bound |
 | M-TURN-04 | Workpiece deflection | Verified against analytical benchmarks | physics.test.js › deflection formulas | Slender parts |
+| M-CUT-05 | Temperature/strain-rate dependent kc (Johnson–Cook softening) | Limited / experimental | lathe-v2-mech.test.js | Materials with JC data (mild steel, EN8, EN24, Cu, brass, Ti-6Al-4V); K clipped 0.3–1.5 |
+| M-CUT-06 | Shear-angle relation options and edge (ploughing) forces | Verified against analytical benchmarks | lathe-v2-mech.test.js | Calibrated range |
+| M-THERM-04 | Conjugate transient tool thermal model with interface heat partition | Verified against analytical benchmarks | lathe-v2-thermal.test.js (energy conservation, erfc-type flux solution, interface matching) | Continuous chips; trends and relative comparisons |
+| M-TURN-05 | Static deflection fed back into the machined geometry | Verified against analytical benchmarks | lathe-v2-wear.test.js › deflection feedback | Slender parts, rigid-body tool side |
+| M-WEAR-07 | Calibrated flank-wear progression | Verified against analytical benchmarks | lathe-v2-wear.test.js; lathe-v2-mech.test.js | Calibration range |
+| M-WEAR-08 | Nose and notch wear | Implemented, unvalidated | lathe-v2-wear.test.js | User-calibrated |
+| M-WEAR-09 | Crater wear and its effect on rake | Implemented, unvalidated | lathe-v2-wear.test.js | User-calibrated |
+| M-WEAR-10 | Random edge chipping | Verified against analytical benchmarks | lathe-v2-wear.test.js (survival e^−1 at η) | User data |
+| M-WEAR-11 | ISO 3685 tool-life criteria and deformation flag | Verified against analytical benchmarks | lathe-v2-wear.test.js | — |
+| M-DYN-06 | Time-domain regenerative chatter (radial modes) | Verified against analytical benchmarks | lathe-v2-dyn.test.js (0.7×/1.4× b_lim at two speeds) | Linear threshold equals Tlusty lobes with Ks = K_th·n_r² |
+| M-SURF-01 | Vibration-imprinted surface profile and roughness | Verified against analytical benchmarks | lathe-v2-dyn.test.js | Kinematic + vibration |
+| M-SURF-02 | Dimensional deviation along the part | Implemented, unvalidated | lathe-v2-wear.test.js (deflection) | — |
 | M-DRILL-01 | Mechanistic lip model | Limited / experimental | physics.test.js › Drilling vs Sandvik (±30 %) | Twist drills, reamers, countersinks, counterbores |
 | M-DRILL-02 | Chisel-edge thrust | Limited / experimental | prismatic.test.js › Step drilling | Must be calibrated with a dynamometer |
 | M-DRILL-03 | Drill deflection & hole oversize | Limited / experimental | — | Trend only |
@@ -59,6 +71,11 @@ Status vocabulary (specification §23): **Implemented, unvalidated** · **Verifi
 - Tlusty minimum stability limit equals 2kζ(1+ζ)/Ks within 0.2 %; Altintas–Budak directional factors equal numerical integrals (physics.test.js).
 - Kienzle, Taylor and extended-Taylor calibration recover known constants from synthetic data exactly (research.test.js).
 - ToolVision measures a synthetic wear land within 3 % (mean) and ±2 px (max) (research.test.js).
+- V2: JC softening factor is exactly 1 at the kc reference and < 1 at higher speed; Lee–Shaffer energy balance; edge-force and wear-progression calibration recover constants (lathe-v2-mech.test.js).
+- V2: ADI thermal scheme conserves energy to round-off; constant-flux surface temperature within 2 % of 2q√(αt/π)/k; chip-/tool-side interface temperatures equal within 0.5 K (lathe-v2-thermal.test.js).
+- V2: Weibull chipping survival at t = η equals e^−1 within 4 % (3000 edges); crater lowers Fc; nose wear sets recession (lathe-v2-wear.test.js).
+- V2: deflection feedback reproduces the cantilever oversize 2·Fp·z³/(3EI) within 10 % (lathe-v2-wear.test.js).
+- V2: time-domain chatter is stable at 0.7·b_lim and unstable at 1.4·b_lim of the Tlusty envelope at two speeds (lathe-v2-dyn.test.js).
 
 ## Data provenance summary
 

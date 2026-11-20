@@ -39,7 +39,11 @@ export class Viewport {
       this._raf = requestAnimationFrame(this._loop);
       this.onFrame?.();
       this.controls.update();
+      this.renderer.setScissorTest(false);
+      const w = this.host.clientWidth || 400, hh = this.host.clientHeight || 300;
+      this.renderer.setViewport(0, 0, w, hh);
       this.renderer.render(this.scene, this.camera);
+      this.postRender?.(w, hh);
     };
     this._loop();
   }

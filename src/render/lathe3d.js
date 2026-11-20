@@ -2,6 +2,7 @@
 // tool mesh extruded from the actual tool outline, kinematic chain (saddle → cross-slide → compound → tool post).
 // Scene mapping: spindle axis = +X (chuck face at x = 0), up = +Y, radial tool direction (toward operator) = +Z.
 import { THREE, Viewport, MAT, box, cyl, forceArrow } from './scene.js';
+import { turbo } from '../ui/chart.js';
 
 const HC = 260; // centre height above bed datum, mm
 const NTH = 72; // circumferential segments
@@ -20,6 +21,72 @@ export class Lathe3D {
     this.forceScale = 0.08;
     this.vp.onFrame = () => this._frame();
     this._last = performance.now();
+    // chip ribbon and cutting-zone inset camera
+    this.chipMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, metalness: 0.4, roughness: 0.5 }));
+    this.chipMesh.visible = false; this.vp.scene.add(this.chipMesh);
+    this.zoomCam = new THREE.PerspectiveCamera(30, 1, 0.1, 2000);
+    this.zoom = false;
+    this.vp.postRender = (w, h) => this._inset(w, h);
+  }
+
+  /** Picture-in-picture magnified view of the cutting zone (bottom-right quarter). */
+  _inset(w, h) {
+    if (!this.zoom || this.drilling) return;
+    const r = this.vp.renderer, iw = Math.round(w * 0.38), ih = Math.round(h * 0.38);
+    const p = this.toolGroup.position;
+    this.zoomCam.aspect = iw / ih; this.zoomCam.updateProjectionMatrix();
+    this.zoomCam.position.set(p.x + 9, p.y + 14, p.z + 22); this.zoomCam.lookAt(p.x - 1, p.y, p.z - 1);
+    r.setScissorTest(true); r.setScissor(w - iw - 8, 8, iw, ih); r.setViewport(w - iw - 8, 8, iw, ih);
+    r.render(this.vp.scene, this.zoomCam);
+    r.setScissorTest(false);
+  }
+  setZoom(on) { this.zoom = on; }
+
+  /**
+   * Chip ribbon: leaves the engaged edge across the rake face in the chip-flow direction (normal to the mean engaged
+   * edge, Colwell), width = engaged edge length l, thickness = deformed chip thickness hc, curling upward with radius
+   * ρ ≈ 8·hc (visual curl radius — chip curl is NOT predicted). Colour = chip temperature from the thermal model.
+   */
+  setChip(s) {
+    if (this.drilling || !s || !s.cutting || !s.thermal) { this.chipMesh.visible = false; return; }
+    const th = s.thermal, l = Math.min(s.l || 1, 12), hc = Math.max(th.hc || 0.3, 0.05);
+    const fz = (s.Ff || 0) / (Math.hypot(s.Ff || 0, s.Fp || 0) || 1);
+    const fr = (s.Fp || 0) / (Math.hypot(s.Ff || 0, s.Fp || 0) || 1);
+    const dir = new THREE.Vector3(fz, 0, fr).normalize(); // thrust direction on the tool = chip-flow direction on the rake
+    if (!Number.isFinite(dir.x)) dir.set(1, 0, 0);
+    const side = new THREE.Vector3(-dir.z, 0, dir.x); // along the edge
+    const rho = Math.max(1.2, 8 * hc), turns = 1.6, nS = 60;
+    const o = this.toolGroup.position.clone().add(new THREE.Vector3(0, 0.05, 0));
+    const pos = [], col = [], idx = [];
+    const Tm = th.TchipMean ?? th.Tshear, Ti = th.conj?.Trake ?? th.TrakeMax;
+    const lo = 20, hi = Math.max(Ti || 600, Tm || 400, 400);
+    for (let k = 0; k <= nS; k++) {
+      const a = (k / nS) * turns * 2 * Math.PI;
+      const c = o.clone().addScaledVector(dir, rho * Math.sin(a) + 0.4).add(new THREE.Vector3(0, rho * (1 - Math.cos(a)), 0)).addScaledVector(side, (k / nS) * 1.5 * l);
+      const T = k < 4 ? Ti : Tm - (Tm - lo) * Math.min(0.6, (k / nS) * 0.6); // cools after leaving the contact (visual)
+      const cc = new THREE.Color(turbo((T - lo) / (hi - lo)));
+      for (const sgn of [-0.5, 0.5]) { const p = c.clone().addScaledVector(side, sgn * l); pos.push(p.x, p.y, p.z); col.push(cc.r, cc.g, cc.b); }
+      if (k < nS) { const b = 2 * k; idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+    this.chipMesh.geometry.dispose(); this.chipMesh.geometry = g; this.chipMesh.visible = true;
+  }
+
+  /** Colour the insert by the tool temperature field (x = distance from the tool tip in the rake plane, y = depth). */
+  setToolTemps(thermal) {
+    const ins = this.toolGroup.children[0];
+    if (!ins || this.drilling || !thermal) return;
+    const g = ins.geometry, P = g.attributes.position;
+    let C = g.attributes.color;
+    if (!C) { C = new THREE.BufferAttribute(new Float32Array(P.count * 3), 3); g.setAttribute('color', C); ins.material = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.3, roughness: 0.5 }); }
+    const lo = thermal.T0, hi = Math.max(thermal.max(), lo + 50);
+    for (let i = 0; i < P.count; i++) {
+      const x = Math.hypot(P.getX(i), P.getZ(i)), y = -P.getY(i);
+      const c = new THREE.Color(turbo((thermal.at(x, y) - lo) / (hi - lo)));
+      C.setXYZ(i, c.r, c.g, c.b);
+    }
+    C.needsUpdate = true;
   }
   dispose() { this.vp.dispose(); }
 
@@ -179,7 +246,7 @@ export class Lathe3D {
     const L = this.wp ? this.wp.L : 200;
     if (name === 'top') this.vp.setView([L / 2, HC + 700, 1], [L / 2, HC, 0]);
     else if (name === 'front') this.vp.setView([L / 2, HC, 650], [L / 2, HC, 0]);
-    else if (name === 'tool') { const p = this.toolGroup.position; this.vp.setView([p.x + 60, p.y + 70, p.z + 120], [p.x, p.y, p.z]); }
+    else if (name === 'tool') { const p = this.drilling ? this.drillGroup.position : this.toolGroup.position; this.vp.setView([p.x + 70, p.y + 45, p.z + 95], [p.x, p.y, p.z]); }
     else this.vp.setView([L / 2 + 250, HC + 430, 980], [L / 2 - 40, HC - 40, 0]);
   }
 }

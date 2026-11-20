@@ -1,4 +1,6 @@
-# Development status — v1.0.0 (2026-11-18)
+# Development status — v1.1.0 (2026-11-21)
+
+**Lathe V2 integrated** (see LATHE_V2.md): mechanics, conjugate thermal, multi-mode wear, deflection feedback, time-domain chatter, surface/dimension prediction, chip/temperature 3-D views, workflow and research features. Acceptance test B is now Pass for flank/nose/temperature/force/surface/life; crater/notch need user coefficients.
 
 Status vocabulary (spec §26): Not started · Architecture completed · Implementation in progress · Implemented ·
 Unit tested · Integrated · Validated · Released. **No module is “Validated”**: that requires experimental data,
@@ -35,7 +37,7 @@ which only the user can supply (Research → Experiments).
 | Test | Result | Evidence / gaps |
 |---|---|---|
 | A Lathe turning | **Pass** | EN8 + carbide CNMG: material removal, Fc/Ff/Fp, torque, power, MRR, force–time graph |
-| B Lathe tool wear | **Partial** | VB progression, tool temperature, force increase, nose-recession size change, tool life: yes. Crater wear: Usui interface in code, not exposed in UI (no defensible coefficients). Wear effect on Ra: not modelled |
+| B Lathe tool wear | **Pass (V2)** / partial | VB (Taylor or calibrated), VC, tool temperature (conjugate), force increase, diameter change, Ra via vibration, ISO criteria. Crater/notch/chipping: implemented in the UI, need user coefficients |
 | C Radial drilling | **Pass** | Arm/head positioning, drill rotation, progressive hole, thrust, torque, power, MRR |
 | D Drill wear | **Partial** | Independent lip wear, thrust/torque variation, radial imbalance, hole-oversize trend: yes. Chisel-edge wear is a user-set condition (no predictive model) |
 | E Milling | **Pass** | Face & slot: rotation, tooth engagement, removal, instantaneous chip thickness, tooth forces, resultant, torque, power, force vs rotation |
