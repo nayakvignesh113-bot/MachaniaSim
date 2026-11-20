@@ -146,8 +146,8 @@ export class LathePageV2 extends LathePage {
     this.measEl = h('div'); this.cMeas = new Chart({ title: 'Measured vs simulated', xLabel: 'Time (s)', yLabel: 'Value' });
     this.meas = { type: 'dyn', t: '', a: '', b: '', c: '', shift: 0 };
     addTab(this.tabs, 'meas', 'Measured', h('div', {},
-      selectField(this.meas, 'type', [{ value: 'dyn', label: 'Dynamometer (t [s], Fc, Ff, Fp [N])' }, { value: 'tc', label: 'Thermocouple in the tool (t [s], T [°C]) at the probe point' }, { value: 'vb', label: 'Microscope / ToolVision wear series (cutting time [min], VB [mm])' }], { label: 'Data type', onChange: () => this._measUI() }),
-      h('button', { class: 'btn primary', type: 'button', onclick: async () => { const f = await pickFile('.csv,.txt,.xlsx,.xls'); if (!f) return; try { this.meas.data = await readTable(f); this.meas.name = f.name; this._measUI(); } catch (e) { toast(e.message, 'error'); } } }, 'Import CSV / TXT / XLSX'),
+      selectField(this.meas, 'type', [{ value: 'dyn', label: 'Dynamometer (t [s], Fc, Ff, Fp [N])' }, { value: 'tc', label: 'Thermocouple in the tool (t [s], T [°C]) at the probe point' }, { value: 'vb', label: 'Microscope / ToolVision wear series (cutting time [min], VB [mm])' }], { label: 'Data type', onChange: () => { Object.assign(this.meas, { t: '', a: '', b: '', c: '' }); this._measUI(); } }),
+      h('button', { class: 'btn primary', type: 'button', onclick: async () => { const f = await pickFile('.csv,.txt,.xlsx,.xls'); if (!f) return; try { Object.assign(this.meas, { data: await readTable(f), name: f.name, t: '', a: '', b: '', c: '' }); this._measUI(); } catch (e) { toast(e.message, 'error'); } } }, 'Import CSV / TXT / XLSX'),
       numField(this.meas, 'shift', { label: 'Time shift applied to measurement', unit: 's', onChange: () => this._measCompare() }),
       this.measMap = h('div'), this.cMeas.el, this.measEl), () => this._measCompare());
     this._applyStep();
@@ -352,6 +352,7 @@ export class LathePageV2 extends LathePage {
     const M = this.meas, d = M.data;
     const rows = d.rows.map((r) => ({ t: r[M.t], VB: r[M.a] })).filter((r) => Number.isFinite(r.t) && Number.isFinite(r.VB)).sort((a, b) => a.t - b.t);
     try {
+      if (rows.length < 2) throw new Error('Select the cutting-time and VB columns (need ≥ 2 numeric rows)');
       const VB0 = rows[0].t === 0 ? rows[0].VB : 0;
       const fit = fitWearPower(rows, VB0);
       Object.assign(this.s.wcfg, { flankModel: 'power', A: +fit.A.toPrecision(5), B: +fit.B.toPrecision(5), Vref: this.p.V, fref: this.p.f, apref: this.p.ap ?? 1 });
