@@ -265,3 +265,22 @@ export function interp(xs, ys, x) {
   const t = (x - xs[lo]) / (xs[hi] - xs[lo]);
   return ys[lo] + t * (ys[hi] - ys[lo]);
 }
+
+/**
+ * Linear edge-force (mechanistic) calibration (Altintas): F/b = Kc·h + Ke from orthogonal or turning tests.
+ * rows: {h, b, F}. Returns cutting coefficient Kc [N/mm²] and edge coefficient Ke [N/mm].
+ */
+export function fitLinearEdge(rows) {
+  const ok = rows.filter((r) => r.h > 0 && r.b > 0 && Number.isFinite(r.F));
+  if (ok.length < 2) throw new Error('Need ≥ 2 rows with h, b, F');
+  const r = linreg(ok.map((d) => d.h), ok.map((d) => d.F / d.b));
+  return { Kc: r.b, Ke: r.a, R2: r.R2, n: ok.length };
+}
+
+/** Empirical flank-wear progression VB = VB0 + A·t^B (fit on VB − VB0 > 0), e.g. from microscope series. */
+export function fitWearPower(rows, VB0 = 0) {
+  const ok = rows.filter((r) => r.t > 0 && r.VB - VB0 > 0);
+  if (ok.length < 2) throw new Error('Need ≥ 2 rows with t > 0 and VB > VB0');
+  const r = linreg(ok.map((d) => Math.log(d.t)), ok.map((d) => Math.log(d.VB - VB0)));
+  return { A: Math.exp(r.a), B: r.b, VB0, R2: r.R2, n: ok.length };
+}
