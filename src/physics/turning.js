@@ -7,7 +7,8 @@
 // Units: V m/min, f mm/rev, ap mm, D mm, forces N, torque N·m, power kW, MRR mm³/min.
 
 import { DEG, spindleSpeed } from '../core/units.js';
-import { kienzleKc, rakeFactor, thrustRatio, wearLandForces, defaultWearLand, KIENZLE_H_RANGE } from './cutting.js';
+import { kienzleKc, rakeFactor, thrustRatio, wearLandForces, defaultWearLand, KIENZLE_H_RANGE, jcRateThermal, shearStrainRate, edgePloughForces } from './cutting.js';
+import { cuttingTemperature } from './thermal.js';
 
 /**
  * Core force law shared by nominal and geometric paths.
@@ -18,32 +19,68 @@ import { kienzleKc, rakeFactor, thrustRatio, wearLandForces, defaultWearLand, KI
  * @param VB   flank wear land width, mm (average over the engaged edge)
  * @param land { sigmaW, muW } wear-land parameters (defaults estimated)
  */
-export function edgeForces(mat, tool, A, l, VB = 0, land = null) {
-  if (!(A > 0) || !(l > 0)) return { Fc: 0, Fth: 0, h: 0, kc: 0, warnings: [] };
+export function edgeForces(mat, tool, A, l, VB = 0, land = null, opts = null) {
+  if (!(A > 0) || !(l > 0)) return { Fc: 0, Fth: 0, h: 0, kc: 0, Ksoft: 1, warnings: [] };
   const h = A / l;
   const Kg = rakeFactor(tool.rake ?? 0, mat.rake0 ?? 6);
-  const kc = kienzleKc(mat.kc11, mat.mc, h) * Kg;
-  const Fc0 = kc * A;
-  const Fth0 = Fc0 * thrustRatio(mat.mu, tool.rake ?? 0);
+  const soft = opts?.softening && opts.V > 0 && mat.jc ? softeningFactor(mat, tool, h, l, opts.V, opts.softening, opts.shearModel) : null;
+  const Ksoft = soft ? soft.K : 1;
+  const kc = kienzleKc(mat.kc11, mat.mc, h) * Kg * Ksoft;
+  const ep = edgePloughForces(opts?.edge, l);
+  const Fc0 = kc * A + ep.dFc;
+  const Fth0 = kc * A * thrustRatio(mat.mu, tool.rake ?? 0) + ep.dFth;
   const L = land || defaultWearLand(mat);
   const w = wearLandForces(VB, l, L.sigmaW, L.muW);
   const warnings = [];
+  if (soft?.warning) warnings.push(soft.warning);
   if (h < KIENZLE_H_RANGE[0]) warnings.push(`h = ${h.toFixed(3)} mm is below the Kienzle validity range (≥ ${KIENZLE_H_RANGE[0]} mm); kc is extrapolated.`);
   if (h > KIENZLE_H_RANGE[1]) warnings.push(`h = ${h.toFixed(3)} mm is above the Kienzle validity range.`);
-  return { Fc: Fc0 + w.dFc, Fth: Fth0 + w.dFth, Fc0, Fth0, dFcWear: w.dFc, dFthWear: w.dFth, h, kc, Kg, warnings };
+  return { Fc: Fc0 + w.dFc, Fth: Fth0 + w.dFth, Fc0, Fth0, dFcWear: w.dFc, dFthWear: w.dFth, dFcEdge: ep.dFc, h, kc, Kg, Ksoft, soft, warnings };
+}
+
+/** Reference cutting condition at which tool-maker kc1.1 data are taken to apply (ASSUMED — see M-CUT-05). */
+export const KC_REFERENCE = { V: 100, h: 0.25, status: 'estimated', note: 'Tool-maker kc1.1 tables do not state the cutting speed; 100 m/min, h = 0.25 mm is an assumed reference. Calibrate kc1.1 at your speed to remove this assumption.' };
+
+/**
+ * Temperature- and strain-rate-dependent correction of kc (M-CUT-05):
+ *   K = JC_{rate,T}(Tsh, ε̇) / JC_{rate,T}(Tsh,ref, ε̇_ref)
+ * where Tsh is the Boothroyd shear-plane temperature computed with the corrected forces (fixed-point
+ * iteration) and the reference state is KC_REFERENCE. Requires Johnson–Cook data; K = 1 otherwise.
+ */
+export function softeningFactor(mat, tool, h, b, V, ref = KC_REFERENCE, shearModel = 'merchant') {
+  if (!mat.jc) return { K: 1, warning: null, note: 'No Johnson–Cook data: kc not temperature-corrected' };
+  const r = ref === true ? KC_REFERENCE : ref;
+  const g = tool.rake ?? 0;
+  const base = (hh) => { const kc = kienzleKc(mat.kc11, mat.mc, hh) * rakeFactor(g, mat.rake0 ?? 6); return { Fc: kc * hh, Fth: kc * hh * thrustRatio(mat.mu, g) }; };
+  const state = (hh, bb, VV, K) => {
+    const f = base(hh);
+    const t = cuttingTemperature({ mat, Fc: f.Fc * bb * K, Fth: f.Fth * bb * K, gamma: g, V: VV, h: hh, b: bb, shearModel });
+    return { Tsh: t.Tshear, rate: shearStrainRate(t.Vs, hh, (t.phi * Math.PI) / 180) };
+  };
+  const sref = state(r.h, 1, r.V, 1); // by definition K = 1 at the reference state
+  const Jref = jcRateThermal(mat.jc, sref.Tsh, sref.rate);
+  let K = 1, st = null;
+  for (let i = 0; i < 25; i++) {
+    st = state(h, b, V, K);
+    const Kn = jcRateThermal(mat.jc, st.Tsh, st.rate) / Jref;
+    if (Math.abs(Kn - K) < 1e-6) { K = Kn; break; }
+    K = 0.5 * K + 0.5 * Kn; // under-relaxed fixed point
+  }
+  K = Math.min(1.5, Math.max(0.3, K));
+  return { K, Tsh: st.Tsh, rate: st.rate, Tsh_ref: sref.Tsh, rate_ref: sref.rate, warning: K <= 0.3 || K >= 1.5 ? 'Thermal-softening factor clipped to [0.3, 1.5] — condition far from the kc1.1 reference.' : null };
 }
 
 /**
  * Nominal (closed-form) turning calculation for longitudinal turning.
  * Nose radius neglected in the chip geometry (stated limitation; the geometric engine includes it).
  */
-export function turningNominal({ mat, tool, V, f, ap, D, VB = 0, land = null }) {
+export function turningNominal({ mat, tool, V, f, ap, D, VB = 0, land = null, opts = null }) {
   const kr = (tool.kr ?? 90) * DEG;
   const sk = Math.sin(kr);
   const h = f * sk;
   const b = ap / sk;
   const A = f * ap;
-  const r = edgeForces(mat, tool, A, b, VB, land);
+  const r = edgeForces(mat, tool, A, b, VB, land, opts ? { ...opts, V } : null);
   // Chip flow normal to the major edge: thrust splits into feed (axial) and passive (radial) components.
   const Ff = r.Fth * Math.sin(kr);
   const Fp = r.Fth * Math.cos(kr);
@@ -54,7 +91,7 @@ export function turningNominal({ mat, tool, V, f, ap, D, VB = 0, land = null }) 
   const power = (r.Fc * Vm) / 60000; // kW  (= torque·ω)
   const mrr = Math.PI * (D - ap) * ap * f * N; // mm³/min, exact annulus volume rate
   return {
-    h, b, A, kc: r.kc, Kg: r.Kg, Fc: r.Fc, Ff, Fp, Fth: r.Fth,
+    h, b, A, kc: r.kc, Kg: r.Kg, Ksoft: r.Ksoft, Fc: r.Fc, Ff, Fp, Fth: r.Fth,
     R: Math.hypot(r.Fc, Ff, Fp), N, Vm, torque, power, mrr,
     mrrApprox: 1000 * V * f * ap, // textbook approximation (uses uncut diameter)
     specificEnergy: r.Fc / A, // N/mm² = J/mm³
@@ -67,8 +104,9 @@ export function turningNominal({ mat, tool, V, f, ap, D, VB = 0, land = null }) 
  * @param eng { A (mm²/rev), l (mm), nz, nr (unit thrust direction on tool in z-r plane), rMean (mm) }
  * @param N spindle speed rev/min
  */
-export function forcesFromEngagement({ mat, tool, eng, N, VB = 0, land = null }) {
-  const r = edgeForces(mat, tool, eng.A, eng.l, VB, land);
+export function forcesFromEngagement({ mat, tool, eng, N, VB = 0, land = null, opts = null }) {
+  const Vm0 = (2 * Math.PI * eng.rMean * N) / 1000;
+  const r = edgeForces(mat, tool, eng.A, eng.l, VB, land, opts ? { ...opts, V: Vm0 } : null);
   const Ff = r.Fth * eng.nz; // axial component on tool (+z away from chuck)
   const Fp = r.Fth * eng.nr; // radial component on tool (+r outward)
   const Vm = (2 * Math.PI * eng.rMean * N) / 1000;

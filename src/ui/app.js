@@ -4,7 +4,7 @@ import { VERSION } from '../core/version.js';
 
 const ROUTES = [
   { id: 'home', label: 'Dashboard', load: () => import('./pages/home.js').then((m) => m.HomePage) },
-  { id: 'lathe', label: 'Lathe', load: () => import('./pages/lathe.js').then((m) => m.LathePage) },
+  { id: 'lathe', label: 'Lathe', load: () => import('./pages/lathe-v2.js').then((m) => m.LathePageV2) },
   { id: 'drill', label: 'Radial drill', load: () => import('./pages/drill.js').then((m) => m.DrillPage) },
   { id: 'mill', label: 'Milling', load: () => import('./pages/mill.js').then((m) => m.MillPage) },
   { id: 'grind', label: 'Grinding', load: () => import('./pages/grind.js').then((m) => m.GrindPage) },

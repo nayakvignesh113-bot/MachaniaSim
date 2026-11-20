@@ -39,7 +39,7 @@ python3 -m http.server 8080      # or: npx serve .
 Run the automated verification suite (Node ≥ 20):
 
 ```bash
-npm test          # 44 tests: physics, geometry, simulators, research tools
+npm test          # 63 tests: physics, geometry, simulators, research tools
 npm run docs      # regenerate MATHEMATICAL_MODELS.md and VALIDATION_REGISTER.md from the model registry
 ```
 

@@ -183,3 +183,8 @@ canvas.anim { width: 100%; height: 300px; display: block; background: #fff; bord
   body.print-report .page-reports .content > *:not(#report-preview) { display: none !important; }
   body.print-report #report-preview { box-shadow: none; }
 }
+
+.stepper { padding: 8px 10px; }
+.stepper .row { margin-bottom: 6px; }
+.stepper select { border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; margin-left: auto; }
+.step-btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }

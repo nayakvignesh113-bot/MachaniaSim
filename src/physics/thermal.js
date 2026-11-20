@@ -29,9 +29,9 @@ export const COOLANTS = {
  * @param mat {density, cp, k} ; @param Fc, Fth N ; gamma deg ; V m/min ; h, b mm ; T0 °C
  * @param contactFactor tool–chip contact length l = contactFactor × chip thickness (ESTIMATED, default 2)
  */
-export function cuttingTemperature({ mat, Fc, Fth, gamma, V, h, b, T0 = 20, contactFactor = 2 }) {
+export function cuttingTemperature({ mat, Fc, Fth, gamma, V, h, b, T0 = 20, contactFactor = 2, shearModel = 'merchant' }) {
   if (!(Fc > 0) || !(h > 0) || !(b > 0) || !(V > 0)) return null;
-  const m = merchantAnalysis({ Fc, Fth, gamma, V, h, b });
+  const m = merchantAnalysis({ Fc, Fth, gamma, V, h, b, shearModel });
   const rho = mat.density, c = mat.cp, k = mat.k;
   const v = V / 60; // m/s
   const hm = h / 1000, bm = b / 1000;

@@ -82,10 +82,10 @@ export function defaultWearLand(mat) {
  * Merchant orthogonal cutting relations from measured/predicted forces.
  * Fc, Fth [N], gamma [deg], V [m/min], h, b [mm]. Returns angles in degrees, speeds in m/min.
  */
-export function merchantAnalysis({ Fc, Fth, gamma, V, h, b }) {
+export function merchantAnalysis({ Fc, Fth, gamma, V, h, b, shearModel = 'merchant' }) {
   const g = gamma * DEG;
   const beta = g + Math.atan2(Fth, Fc); // friction angle from the force circle
-  let phi = Math.PI / 4 - (beta - g) / 2; // Merchant minimum-energy shear angle
+  let phi = shearAngle(shearModel, beta, g);
   phi = Math.min(Math.max(phi, 5 * DEG), 60 * DEG);
   const rc = Math.sin(phi) / Math.cos(phi - g); // chip thickness ratio h/hc
   const Fs = Fc * Math.cos(phi) - Fth * Math.sin(phi);
@@ -103,4 +103,38 @@ export function merchantAnalysis({ Fc, Fth, gamma, V, h, b }) {
     Pf: (F * Vch) / 60, // W
     Ptot: (Fc * V) / 60, // W
   };
+}
+
+/**
+ * Shear-angle relations (radians in/out):
+ *   'merchant'     φ = π/4 − (β − γ)/2          (Merchant 1945, minimum energy)
+ *   'lee-shaffer'  φ = π/4 − (β − γ)            (Lee & Shaffer 1951, slip-line field)
+ */
+export function shearAngle(model, beta, gamma) {
+  return model === 'lee-shaffer' ? Math.PI / 4 - (beta - gamma) : Math.PI / 4 - (beta - gamma) / 2;
+}
+
+/**
+ * Johnson–Cook rate × thermal factors (the strain term cancels when two states at equal strain are compared).
+ * T in °C, rate in 1/s. Returns (1 + C ln(ε̇/ε̇0))·(1 − Θ^m), Θ = (T − Tr)/(Tm − Tr).
+ */
+export function jcRateThermal(jc, T, rate, Tr = 20) {
+  const Th = Math.min(0.999, Math.max(0, (T - Tr) / (jc.TmK - 273.15 - Tr)));
+  return (1 + jc.C * Math.log(Math.max(rate / jc.eps0, 1))) * (1 - Math.pow(Th, jc.m));
+}
+
+/** Primary shear-zone strain rate estimate ε̇ = Vs / (k·l_AB), l_AB = h/sinφ. k cancels in ratios (Oxley-type). */
+export function shearStrainRate(Vs_mmin, h, phiRad, k = 0.1) {
+  const lAB = h / Math.sin(phiRad);
+  return (Vs_mmin * 1000) / 60 / (k * lAB);
+}
+
+/**
+ * Edge (ploughing) force components per unit engaged edge length (Altintas linear edge-force model):
+ *   ΔFc = Kte·l,  ΔFth = Kre·l   [N/mm × mm]. Defaults 0 (not included) — calibrate from the intercept of
+ *   F/b versus h (Research → Calibration).
+ */
+export function edgePloughForces(edge, l) {
+  if (!edge || !(l > 0)) return { dFc: 0, dFth: 0 };
+  return { dFc: (edge.Kte || 0) * l, dFth: (edge.Kre || 0) * l };
 }

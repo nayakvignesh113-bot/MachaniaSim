@@ -1,6 +1,6 @@
 # MachinaSim — Mathematical models
 
-_Generated from `src/core/models.js` (v1.0.0). Do not edit by hand; run `node scripts/gen-docs.mjs`._
+_Generated from `src/core/models.js` (v1.1.0). Do not edit by hand; run `node scripts/gen-docs.mjs`._
 
 Internal units: mm, N, N·m, kW, m/min, rev/min, °C, s (tool life in min). See `src/core/units.js`.
 
@@ -88,6 +88,126 @@ Internal units: mm, N, N·m, kW, m/min, rev/min, °C, s (tool life in min). See 
 - **Automated verification:** physics.test.js › deflection formulas
 - **References:** Roark
 
+### M-CUT-05 — Temperature/strain-rate dependent kc (Johnson–Cook softening)
+
+- **Equation(s):** `K = [1 + C ln(ε̇/ε̇0)][1 − Θ^m] / same at reference; Θ = (Tsh − Tr)/(Tm − Tr); Tsh Boothroyd shear-plane temperature (fixed-point with forces); ε̇ ∝ Vs·sinφ/h`
+- **Variables / inputs:** JC (C, m, Tm) per material; reference V = 100 m/min, h = 0.25 mm (ASSUMED)
+- **Assumptions:** Tool-maker kc1.1 taken to apply at the assumed reference; strain term cancels; only primary-zone softening.
+- **Validity range:** Materials with JC data (mild steel, EN8, EN24, Cu, brass, Ti-6Al-4V); K clipped 0.3–1.5
+- **Status:** Limited / experimental
+- **Automated verification:** lathe-v2-mech.test.js
+- **References:** Johnson & Cook (1983); Oxley, Mechanics of Machining (1989) (concept)
+
+### M-CUT-06 — Shear-angle relation options and edge (ploughing) forces
+
+- **Equation(s):** `Merchant φ = 45° − (β−γ)/2 or Lee–Shaffer φ = 45° − (β−γ); ΔFc = Kte·l, ΔFth = Kre·l`
+- **Variables / inputs:** Kte, Kre user-calibrated (default 0); F/b = Kc·h + Ke calibration
+- **Assumptions:** Linear edge-force model (Altintas).
+- **Validity range:** Calibrated range
+- **Status:** Verified against analytical benchmarks
+- **Automated verification:** lathe-v2-mech.test.js
+- **References:** Merchant (1945); Lee & Shaffer (1951); Altintas (2012)
+
+### M-THERM-04 — Conjugate transient tool thermal model with interface heat partition
+
+- **Equation(s):** `ρc ∂T/∂t = k∇²T (2-D FV, graded mesh, Peaceman–Rachford ADI); q_tool = (1−R)Pf/(lc·b); chip side T̄ = Tsh + R·q·(4/3k)√(αl/πVch); flank land analogous vs workpiece`
+- **Variables / inputs:** tool k, ρ, c; chip/work k, α; lc = 2hc (ESTIMATED); coolant h (ESTIMATED)
+- **Assumptions:** 2-D section (no spreading across edge width → upper bound); constant properties; far faces at ambient; lands < 0.02 mm ignored.
+- **Validity range:** Continuous chips; trends and relative comparisons
+- **Status:** Verified against analytical benchmarks
+- **Automated verification:** lathe-v2-thermal.test.js (energy conservation, erfc-type flux solution, interface matching)
+- **References:** Loewen & Shaw (1954) (partition concept); Jaeger (1942); Peaceman & Rachford (1955)
+
+### M-TURN-05 — Static deflection fed back into the machined geometry
+
+- **Equation(s):** `Δr = |Fp|·[∫0^z (z−s)²/(E I(s)) ds + 1/k_tool] (chucked, stepped beam); centres: uniform-beam formulae with equivalent Ø`
+- **Variables / inputs:** k_tool (ESTIMATED, user), E, current profile
+- **Assumptions:** Revolution-averaged force (EMA); quasi-static; rigid chuck.
+- **Validity range:** Slender parts, rigid-body tool side
+- **Status:** Verified against analytical benchmarks
+- **Automated verification:** lathe-v2-wear.test.js › deflection feedback
+- **References:** Unit-load method; Roark
+
+### M-WEAR-07 — Calibrated flank-wear progression
+
+- **Equation(s):** `VB = VB0 + A·t^B at reference (V, f, ap); other conditions via equivalent time dt_eq = dt·T(ref)/T(V,f,ap)`
+- **Variables / inputs:** A, B fitted from microscope series (fitWearPower)
+- **Assumptions:** Shape from data; speed dependence through Taylor ratio.
+- **Validity range:** Calibration range
+- **Status:** Verified against analytical benchmarks
+- **Automated verification:** lathe-v2-wear.test.js; lathe-v2-mech.test.js
+- **References:** ISO 3685
+
+### M-WEAR-08 — Nose and notch wear
+
+- **Equation(s):** `dVC = r_C·dVB, dVN = r_N·dVB; nose recession Δr = VC·tanα`
+- **Variables / inputs:** r_C, r_N user ratios (none shipped; VC = VB if empty)
+- **Assumptions:** Proportional to flank-wear rate.
+- **Validity range:** User-calibrated
+- **Status:** Implemented, unvalidated
+- **Automated verification:** lathe-v2-wear.test.js
+- **References:** ISO 3685 (definitions)
+
+### M-WEAR-09 — Crater wear and its effect on rake
+
+- **Equation(s):** `Usui dKT/dt = A·σn·Vch·exp(−B/T) or crater-Taylor (KT criterion at Tc); Δγ = atan(2KT/lc)`
+- **Variables / inputs:** A, B or n, C user
+- **Assumptions:** Crater lowers forces through effective rake (geometric estimate).
+- **Validity range:** User-calibrated
+- **Status:** Implemented, unvalidated
+- **Automated verification:** lathe-v2-wear.test.js
+- **References:** Usui et al. (1984)
+
+### M-WEAR-10 — Random edge chipping
+
+- **Equation(s):** `Weibull hazard h(t) = (β/η)(t/η)^(β−1); event adds chip size to VBmax`
+- **Variables / inputs:** η, β, size from user failure data
+- **Assumptions:** Independent of load (no mechanics-based fracture).
+- **Validity range:** User data
+- **Status:** Verified against analytical benchmarks
+- **Automated verification:** lathe-v2-wear.test.js (survival e^−1 at η)
+- **References:** —
+
+### M-WEAR-11 — ISO 3685 tool-life criteria and deformation flag
+
+- **Equation(s):** `VB ≥ 0.3, VBmax ≥ 0.6, VN ≥ 1.0, KT ≥ 0.06 + 0.3f mm; flag when rake T > tool hot-hardness limit`
+- **Variables / inputs:** —
+- **Assumptions:** Plastic deformation flagged, not quantified.
+- **Validity range:** —
+- **Status:** Verified against analytical benchmarks
+- **Automated verification:** lathe-v2-wear.test.js
+- **References:** ISO 3685:1993
+
+### M-DYN-06 — Time-domain regenerative chatter (radial modes)
+
+- **Equation(s):** `q̈ + 2ζωq̇ + ω²q = ω²F/k; h = h0 − n_r(y(t) − y(t−τ)); F = K_th·b·h·n_r (0 if h ≤ 0); RK4`
+- **Variables / inputs:** modes (ESTIMATED), K_th, n_r, b from the engagement
+- **Assumptions:** Radial structural modes only; tool-leaves-cut nonlinearity; no process damping.
+- **Validity range:** Linear threshold equals Tlusty lobes with Ks = K_th·n_r²
+- **Status:** Verified against analytical benchmarks
+- **Automated verification:** lathe-v2-dyn.test.js (0.7×/1.4× b_lim at two speeds)
+- **References:** Tlusty (1963); Altintas (2012)
+
+### M-SURF-01 — Vibration-imprinted surface profile and roughness
+
+- **Equation(s):** `z(x) = min_k [g(x − k f) + y_k]; Ra, Rq, Rt; Rz = mean of 5 sampling-length peak-to-valley`
+- **Variables / inputs:** tool outline, f, per-revolution displacement y_k
+- **Assumptions:** θ = 0 section; no side flow/BUE.
+- **Validity range:** Kinematic + vibration
+- **Status:** Verified against analytical benchmarks
+- **Automated verification:** lathe-v2-dyn.test.js
+- **References:** ISO 4287 (parameter definitions)
+
+### M-SURF-02 — Dimensional deviation along the part
+
+- **Equation(s):** `ΔD(z) = mean machined Ø (geometry incl. wear recession and deflection) − target Ø`
+- **Variables / inputs:** —
+- **Assumptions:** From the simulated profile.
+- **Validity range:** —
+- **Status:** Implemented, unvalidated
+- **Automated verification:** lathe-v2-wear.test.js (deflection)
+- **References:** —
+
 ### M-THERM-01 — Analytical cutting temperatures
 
 - **Equation(s):** `Boothroyd Γ(RT tanφ); ΔTs = (1−Γ)Ps/(ρcVhb); ΔTm = 1.13√(RT/l0)·ΔTf`
@@ -100,7 +220,7 @@ Internal units: mm, N, N·m, kW, m/min, rev/min, °C, s (tool life in min). See 
 
 ### M-DYN-01 — Tlusty stability lobes
 
-- **Equation(s):** `b_lim = −1/(2 Ks Re G); n = 60 fc/(j + ε/2π), ε = 2π − 2 atan(Re/Im)`
+- **Equation(s):** `b_lim = −1/(2 Ks Re G); n = 60 fc/(j + ε/2π), ε = 2π − 2 atan(Re/Im); V2 lathe: Ks = K_th·n_r² (orientation from engagement)`
 - **Variables / inputs:** modal k, ζ, fn (ESTIMATED defaults — tap test required)
 - **Assumptions:** SDOF, oriented FRF
 - **Validity range:** Linear regenerative chatter
