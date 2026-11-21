@@ -1,4 +1,5 @@
 // Radial drilling machine workspace.
+import { defaultWearLand } from '../../physics/cutting.js';
 import { h, numField, selectField, panel, tabs, q, kv, toast } from '../dom.js';
 import { Chart } from '../chart.js';
 import { lib, materialSelect, materialSummary, toolEditor, processPanel, runBar, readouts, alertsBox, Driver, modelNote } from '../common.js';
@@ -131,7 +132,7 @@ export class DrillPage {
   }
   _configure() {
     const s = this.s;
-    Object.assign(this.sim, { mat: this.mat, tool: s.tool, toolMat: getToolMaterial(s.tool.material), land: s.land, machine: { ...RADIAL_DRILL, Pmax: s.limits?.P ?? RADIAL_DRILL.Pmax } });
+    Object.assign(this.sim, { mat: this.mat, tool: s.tool, toolMat: getToolMaterial(s.tool.material), land: s.land || defaultWearLand(this.mat), machine: { ...RADIAL_DRILL, Pmax: s.limits?.P ?? RADIAL_DRILL.Pmax } });
     this._setWear();
   }
   resetPart(ask) {

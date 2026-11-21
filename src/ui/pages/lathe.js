@@ -13,7 +13,7 @@ import { EdgeWear, taylorLife } from '../../physics/wear.js';
 import { turningNominal, theoreticalRoughness } from '../../physics/turning.js';
 import { cuttingTemperature, ToolFD, COOLANTS } from '../../physics/thermal.js';
 import { turningLobes, DEFAULT_MODES, lobeEnvelope } from '../../physics/dynamics.js';
-import { kienzleKc } from '../../physics/cutting.js';
+import { kienzleKc, defaultWearLand } from '../../physics/cutting.js';
 import { webglAvailable } from '../../render/scene.js';
 
 const OP_DEFAULTS = {
@@ -194,7 +194,7 @@ export class LathePage {
     sim.mat = this.mat; sim.tool = s.tool; sim.outline = this.outline;
     sim.toolMat = getToolMaterial(s.tool.material);
     sim.wear = this._wear();
-    sim.land = s.land; sim.limits = s.limits; sim.machine = { Pmax: s.limits?.P ?? 7.5 };
+    sim.land = s.land || defaultWearLand(this.mat); sim.limits = s.limits; sim.machine = { Pmax: s.limits?.P ?? 7.5 };
     sim.support = s.support;
     const tp = sim.toolMat.props;
     sim.fd = new ToolFD({ W: 4, H: 4, nx: 21, ny: 21, k: tp.k.value, rho: tp.density.value, cp: tp.cp.value, hConv: COOLANTS[s.coolant]?.h ?? 20, T0: 20 });

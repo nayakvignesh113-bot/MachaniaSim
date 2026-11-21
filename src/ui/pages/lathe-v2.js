@@ -10,7 +10,7 @@ import { COOLANTS } from '../../physics/thermal.js';
 import { getToolMaterial } from '../../core/tools.js';
 import { turningLobes, lobeEnvelope, amplitudeSpectrum } from '../../physics/dynamics.js';
 import { turningTimeDomain, vibratedProfile } from '../../physics/chatter.js';
-import { kienzleKc, thrustRatio } from '../../physics/cutting.js';
+import { kienzleKc, thrustRatio, defaultWearLand } from '../../physics/cutting.js';
 import { KC_REFERENCE } from '../../physics/turning.js';
 import { errorMetrics, interp, toCSV, fitWearPower } from '../../research/stats.js';
 import { readTable } from './research.js';
@@ -72,7 +72,7 @@ export class LathePageV2 extends LathePage {
     sim.mat = this.mat; sim.tool = s.tool; sim.outline = this.outline;
     sim.toolMat = getToolMaterial(s.tool.material);
     sim.wear = this._wear();
-    sim.land = s.land; sim.limits = s.limits; sim.machine = { Pmax: s.limits?.P ?? 7.5 };
+    sim.land = s.land || defaultWearLand(this.mat); sim.limits = s.limits; sim.machine = { Pmax: s.limits?.P ?? 7.5 };
     sim.support = s.support;
     sim.opts = { softening: m2.softening, shearModel: m2.shearModel, deflection: m2.deflection, kTool: m2.kTool > 0 ? m2.kTool : Infinity, edge: m2.Kte || m2.Kre ? { Kte: m2.Kte, Kre: m2.Kre } : null, probe: m2.probe ? { x: m2.px, y: m2.py } : null };
     const key = `${s.tool.material}|${s.coolant}`;

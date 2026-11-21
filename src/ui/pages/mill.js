@@ -11,7 +11,7 @@ import { EdgeWear, taylorLife } from '../../physics/wear.js';
 import { millingForceCycle, immersionAngles, millingRoughness } from '../../physics/milling.js';
 import { millingLobes, DEFAULT_MODES, lobeEnvelope, periodicResponse, amplitudeSpectrum } from '../../physics/dynamics.js';
 import { cuttingTemperature, ToolFD, COOLANTS } from '../../physics/thermal.js';
-import { kienzleKc, obliqueRatios } from '../../physics/cutting.js';
+import { kienzleKc, obliqueRatios, defaultWearLand } from '../../physics/cutting.js';
 import { webglAvailable } from '../../render/scene.js';
 
 const OP_TOOL = { face: 'face-63-5', end: 'em-10-4f', slot: 'slot-12-2f', side: 'side-80', peripheral: 'slab-63', angular: 'angle-63', profile: 'em-16-3f-hss', contour: 'em-10-4f', ball: 'ball-10-2f', pocket: 'em-10-4f' };
@@ -144,7 +144,7 @@ export class MillPage {
   }
   _configure() {
     const s = this.s;
-    Object.assign(this.sim, { mat: this.mat, tool: s.tool, toolMat: getToolMaterial(s.tool.material), land: s.land, wear: this._wear(), climb: s.climb, machine: { ...MILL_MACHINE, Pmax: s.limits?.P ?? MILL_MACHINE.Pmax } });
+    Object.assign(this.sim, { mat: this.mat, tool: s.tool, toolMat: getToolMaterial(s.tool.material), land: s.land || defaultWearLand(this.mat), wear: this._wear(), climb: s.climb, machine: { ...MILL_MACHINE, Pmax: s.limits?.P ?? MILL_MACHINE.Pmax } });
     this.sim.runout = s.runout > 0 ? Array.from({ length: s.tool.z }, (_, j) => (j === 0 ? s.runout : 0)) : null;
     this.sim._els = null;
   }
