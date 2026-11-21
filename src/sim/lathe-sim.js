@@ -112,7 +112,7 @@ export class LatheSim {
         this._lcPrev = th.contactLength;
       } else this.thermal.stepCutting(dt, null, false);
       const sigmaRake = th ? th.N / Math.max(th.contactLength * res.l, 1e-6) : 0;
-      this.wear.advance(dt, { V: res.Vm, f, ap: res.ap ?? res.l, Trake: tc?.Trake, Tflank: tc?.Tflank, Tint: tc?.Trake, sigmaN: this.land.sigmaW, sigmaRake, Vch: th?.Vch, toolTmax: this.toolMat?.props?.Tmax?.value });
+      this.wear.advance(dt, { V: res.Vm, f, ap: res.ap ?? res.l, Trake: tc?.Trake, Tflank: tc?.Tflank, Tint: tc?.Trake, sigmaN: (this.land || (this.land = defaultWearLand(this.mat))).sigmaW, sigmaRake, Vch: th?.Vch, toolTmax: this.toolMat?.props?.Tmax?.value });
     } else {
       this.thermal.stepCutting(dt, null, false);
     }
