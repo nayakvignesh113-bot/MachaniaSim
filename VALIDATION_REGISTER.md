@@ -1,6 +1,6 @@
 # MachinaSim — Verification & validation register
 
-_Generated from `src/core/models.js` (v1.1.0)._
+_Generated from `src/core/models.js` (v1.2.0)._
 
 Status vocabulary (specification §23): **Implemented, unvalidated** · **Verified against analytical benchmarks** (the code reproduces an equation or an independent analytical/numerical solution in the automated tests) · **Calibrated against experimental data** · **Independently validated** · **Limited / experimental**.
 
@@ -52,7 +52,7 @@ Status vocabulary (specification §23): **Implemented, unvalidated** · **Verifi
 | M-RECIP-01 | Quick-return kinematics & stroke forces | Verified against analytical benchmarks | physics.test.js › quick return | — |
 | M-SAW-01 | Tooth-engagement sawing force | Implemented, unvalidated | — | — |
 | M-BROACH-01 | Broaching force profile | Verified against analytical benchmarks | physics.test.js › Broaching | — |
-| M-RES-01 | Kienzle / Taylor calibration | Verified against analytical benchmarks | research.test.js | Data range |
+| M-RES-01 | Kienzle / Taylor / edge-force / wear calibration with confidence intervals | Verified against analytical benchmarks | research.test.js; calibration-ci.test.js (t quantiles vs tables; Monte Carlo coverage ≈ 95 %) | Data range; CI undefined when n = p |
 | M-VIS-01 | Image-based flank wear measurement | Implemented, unvalidated | research.test.js › synthetic wear land | Calibrated, well-lit microscope images |
 
 ## Verification benchmarks in the test suite

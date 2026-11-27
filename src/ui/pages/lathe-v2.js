@@ -13,6 +13,7 @@ import { turningTimeDomain, vibratedProfile } from '../../physics/chatter.js';
 import { kienzleKc, thrustRatio, defaultWearLand } from '../../physics/cutting.js';
 import { KC_REFERENCE } from '../../physics/turning.js';
 import { errorMetrics, interp, toCSV, fitWearPower } from '../../research/stats.js';
+import { fitView } from '../fitview.js';
 import { readTable } from './research.js';
 import { fmt } from '../../core/units.js';
 
@@ -143,13 +144,13 @@ export class LathePageV2 extends LathePage {
     this.cmpMetric = { k: 'FcMean' };
     addTab(this.tabs, 'cmp', 'Compare', h('div', {}, h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => this._saveRun() }, 'Save last operation as a run'), h('button', { class: 'btn', type: 'button', onclick: () => this._cmpCSV() }, 'Export CSV'), h('button', { class: 'btn danger', type: 'button', onclick: () => { s.runs = []; this._cmp(); } }, 'Clear')),
       selectField(this.cmpMetric, 'k', RUN_METRICS.map((m) => ({ value: m.k, label: m.label })), { label: 'Chart metric', onChange: () => this._cmp() }), this.cCmp.el, this.cmpEl), () => this._cmp());
-    this.measEl = h('div'); this.cMeas = new Chart({ title: 'Measured vs simulated', xLabel: 'Time (s)', yLabel: 'Value' });
+    this.measEl = h('div'); this.wearFitEl = h('div'); this.cMeas = new Chart({ title: 'Measured vs simulated', xLabel: 'Time (s)', yLabel: 'Value' });
     this.meas = { type: 'dyn', t: '', a: '', b: '', c: '', shift: 0 };
     addTab(this.tabs, 'meas', 'Measured', h('div', {},
       selectField(this.meas, 'type', [{ value: 'dyn', label: 'Dynamometer (t [s], Fc, Ff, Fp [N])' }, { value: 'tc', label: 'Thermocouple in the tool (t [s], T [°C]) at the probe point' }, { value: 'vb', label: 'Microscope / ToolVision wear series (cutting time [min], VB [mm])' }], { label: 'Data type', onChange: () => { Object.assign(this.meas, { t: '', a: '', b: '', c: '' }); this._measUI(); } }),
       h('button', { class: 'btn primary', type: 'button', onclick: async () => { const f = await pickFile('.csv,.txt,.xlsx,.xls'); if (!f) return; try { Object.assign(this.meas, { data: await readTable(f), name: f.name, t: '', a: '', b: '', c: '' }); this._measUI(); } catch (e) { toast(e.message, 'error'); } } }, 'Import CSV / TXT / XLSX'),
       numField(this.meas, 'shift', { label: 'Time shift applied to measurement', unit: 's', onChange: () => this._measCompare() }),
-      this.measMap = h('div'), this.cMeas.el, this.measEl), () => this._measCompare());
+      this.measMap = h('div'), this.cMeas.el, this.measEl, this.wearFitEl), () => this._measCompare());
     this._applyStep();
   }
   _applyStep() {
@@ -359,6 +360,7 @@ export class LathePageV2 extends LathePage {
       this.s.VB0 = VB0;
       this._wearPanel.body.replaceChildren(...this._wearBody());
       this._configureSim();
+      this.wearFitEl?.replaceChildren(h('h4', {}, `Wear fit VB = ${fmt(VB0, 3)} + A·t^B`), fitView(fit, [['A', 'A', 'mm/min^B', 4], ['B', 'B', '', 4]], 'Wear fit residuals'));
       toast(`Calibrated: VB = ${fmt(VB0, 3)} + ${fmt(fit.A, 4)}·t^${fmt(fit.B, 3)} (R² ${fmt(fit.R2, 3)}, n = ${fit.n}). Applied to the wear model.`, 'ok');
     } catch (e) { toast(e.message, 'error'); }
   }
@@ -371,6 +373,9 @@ export class LathePageV2 extends LathePage {
     r.results.push(['Nose wear VC', `${fmt(W.VC, 3)} mm`], ['Max rake interface T (conjugate)', q(Math.max(0, ...H.Trake.filter((v) => v != null)), 'temperature')], ['Max deflection', `${fmt(Math.max(0, ...H.defl) * 1000, 3)} µm`], ['Tool-life criterion', W.criterion?.(this.p.f ?? 0.2) || 'not reached']);
     if (this._dynRes) r.results.push(['Time-domain dynamics', `${this._dynRes.stable ? 'stable' : 'chatter'} at N = ${fmt(this._dynRes.N, 4)} rev/min`]);
     r.charts.push(this.cTemp, this.cWear, this.cDim);
+    r.limitations = r.limitations.filter((x) => !/not fed back/.test(x));
+    if (!this.s.m2.deflection) r.limitations.push('Deflection feedback was switched off for this run: the machined geometry ignores workpiece and tool compliance.');
+    r.method = latheV2Method(this.s);
     r.limitations.push('Thermal model is a 2-D tool section with an analytical chip side (upper-bound temperatures).', 'Chip curl in the 3-D view is illustrative; chip thickness and flow direction are computed.', 'Wear modes other than flank need user coefficients; without them they are reported as not predicted.');
     if (this.s.runs.length) r.params.push(...this.s.runs.map((x) => `${x.label}: V=${fmt(x.V, 4)}, f=${x.f}, ap=${x.ap} → Fc ${fmt(x.FcMean, 4)} N, Ra ${fmt(x.Ra, 3)} µm`));
     return r;
@@ -382,6 +387,27 @@ export class LathePageV2 extends LathePage {
     for (const [k, v] of Object.entries(d.wears || {})) if (k === this.s.tool.id) this._wear().restore?.(v);
     this._applyStep();
   }
+}
+
+/** Calculation methodology actually used for a Lathe V2 run, built from the active model options. */
+export function latheV2Method(s) {
+  const m2 = s.m2 || {}, w = s.wcfg || {};
+  const shear = { merchant: 'Merchant (φ = 45° − (β − γ)/2)', 'lee-shaffer': 'Lee–Shaffer (φ = 45° − (β − γ))' }[m2.shearModel] || m2.shearModel || 'Merchant';
+  const flank = w.flankModel === 'power' && w.A > 0 && w.B > 0
+    ? `calibrated power law VB = VB₀ + A·t^B (A = ${w.A}, B = ${w.B}) fitted at V = ${w.Vref} m/min, f = ${w.fref} mm/rev, ap = ${w.apref} mm; other conditions advance by the equivalent time dt·T(ref)/T(V, f, ap) from the Taylor ratio (M-WEAR-07)`
+    : 'Taylor–Miner damage accumulation (dVB/dt = VBc / T(V, f, ap))';
+  const opt = (on, txt) => (on ? txt : null);
+  return [
+    'MachinaSim advances the cut one spindle revolution at a time (time step = 60/N s). Within each revolution the steps below are evaluated in order; every quantity is carried to the next revolution, so the result depends on the cutting history, not only on the nominal parameters.',
+    '1. Kinematics and engagement: the tool outline (insert ISO geometry, κr, κr′, rε) is placed on the planned path. The engaged cutting-edge length l and the uncut chip area A are computed from the current axisymmetric workpiece profile, which is then updated by exact profile stamping; h = A/l is the equivalent chip thickness (M-TURN-02).',
+    `2. Cutting forces: kc = kc1.1·h^(−mc) with rake correction (M-CUT-01, M-CUT-02)${m2.softening ? ', multiplied by a Johnson–Cook thermal and strain-rate softening factor evaluated relative to an assumed reference of V = 100 m/min, h = 0.25 mm (M-CUT-05)' : ''}. Thrust follows from the friction angle (M-CUT-03); shear angle by ${shear} (M-CUT-06). ${m2.Kte || m2.Kre ? `Edge (ploughing) forces Kte = ${m2.Kte}, Kre = ${m2.Kre} N/mm are added per unit engaged edge length (M-CUT-06).` : 'No edge (ploughing) forces were applied (Kte = Kre = 0).'} Flank-wear-land forces σw·VB·l and μw·σw·VB·l are added (M-WEAR-03). Fc, Ff and Fp are resolved through κr, then torque, power and MRR follow.`,
+    '3. Tool temperature: a transient 2-D finite-volume conduction model of a 12 × 12 mm tool section (graded mesh, ADI time stepping) receives heat flux on the rake contact and on the flank wear land. The heat partition is found at each step by matching mean interface temperatures with the chip side (Boothroyd shear-plane temperature + moving band source) and the workpiece side (moving band source) (M-THERM-04).' + (m2.probe ? ` The temperature at the thermocouple location (${m2.px} mm, ${m2.py} mm) is recorded for comparison with measurements.` : ''),
+    `4. Tool condition: flank wear by ${flank}; nose wear VC and notch wear VN as ratios of the flank-wear increment (M-WEAR-08); crater depth KT by ${w.craterA > 0 && w.craterB > 0 ? 'the Usui rate law with user constants' : w.craterC > 0 && w.craterN > 0 ? 'a crater-Taylor law with user constants' : '— not predicted (no constants given)'} (M-WEAR-09); random chipping by ${w.chipEta > 0 && w.chipBeta > 0 ? `a Weibull hazard (η = ${w.chipEta} min, β = ${w.chipBeta})` : '— not predicted (no Weibull constants given)'} (M-WEAR-10). Crater depth raises the effective rake angle; VC recedes the tool nose; tool life ends at the first ISO 3685 criterion reached, and a plastic-deformation flag is raised when the rake temperature exceeds the tool hot-hardness limit (M-WEAR-11).`,
+    opt(m2.deflection, `5. Deflection feedback: the radial force (smoothed revolution to revolution) acting on a stepped beam representing the current workpiece profile (${s.support || 'chuck'}), in series with a tool-side stiffness of ${m2.kTool > 0 ? `${m2.kTool} N/mm` : 'infinity'}, gives the elastic deflection, which reduces the depth actually cut and is written into the machined diameter (M-TURN-05).`),
+    '6. Surface and dimensions: the machined profile is the envelope of the tool-nose positions, including deflection and, when a time-domain dynamics run is made, the vibration displacement; Ra, Rq, Rz and Rt are evaluated over the assessed length, and the diameter deviation along the part is reported (M-SURF-01, M-SURF-02).',
+    '7. Dynamics (on request): regenerative chatter is integrated in the time domain using the radial modal parameters k, ζ, fn and the delayed-chip-thickness force; frequency-domain stability lobes (Tlusty) are given for comparison (M-DYN-06, M-DYN-01).',
+    'Parameter status: every constant used is labelled in the Mathematical models table as published, estimated, calibrated or validated. Values not calibrated against measurements on this machine and material make the reported numbers uncalibrated estimates, not validated predictions.',
+  ].filter(Boolean);
 }
 
 const RUN_METRICS = [

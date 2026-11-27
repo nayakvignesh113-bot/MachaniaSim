@@ -1,4 +1,5 @@
 // MachinaSim application shell: hash router, header, project save/load, page lifecycle.
+import { ProjectStore } from '../core/store.js';
 import { h, $, setUnits, settings, toast, download, pickFile } from './dom.js';
 import { VERSION } from '../core/version.js';
 
@@ -61,21 +62,21 @@ export const app = {
     }
     toast(`Project “${data.name}” loaded (saved with v${data.version})`, 'ok');
   },
-  projects() { try { return JSON.parse(localStorage.getItem('ms.projects') || '[]'); } catch { return []; } },
-  saveProject(name) {
+  store: new ProjectStore(),
+  /** Saved projects, newest first (async). */
+  projects() { return this.store.list(); },
+  async saveProject(name) {
     const d = this.serializeProject(name);
-    const list = this.projects().filter((p) => p.name !== name);
-    const json = JSON.stringify(d);
     try {
-      localStorage.setItem(`ms.project.${name}`, json);
-      list.unshift({ name, saved: d.saved, size: json.length, pages: Object.keys(d.pages) });
-      localStorage.setItem('ms.projects', JSON.stringify(list.slice(0, 30)));
-      toast(`Saved “${name}” in this browser`, 'ok');
-    } catch (e) { toast(`Browser storage full (${(json.length / 1e6).toFixed(1)} MB) — use Export instead`, 'error'); }
+      const meta = await this.store.put(name, d);
+      try { await navigator.storage?.persist?.(); } catch {}
+      toast(`Saved “${name}” in this browser (${(meta.size / 1e6).toFixed(2)} MB)`, 'ok');
+    } catch (e) { toast(`Could not save (${e?.name === 'QuotaExceededError' ? 'browser storage full' : e.message}) — use Export instead`, 'error'); }
     return d;
   },
-  loadProject(name) { const j = localStorage.getItem(`ms.project.${name}`); if (!j) throw new Error('Project not found'); return this.restoreProject(JSON.parse(j)); },
-  deleteProject(name) { localStorage.removeItem(`ms.project.${name}`); localStorage.setItem('ms.projects', JSON.stringify(this.projects().filter((p) => p.name !== name))); },
+  async loadProject(name) { return this.restoreProject(await this.store.get(name)); },
+  deleteProject(name) { return this.store.remove(name); },
+  duplicateProject(name) { return this.store.duplicate(name); },
 };
 
 function header() {
@@ -83,7 +84,7 @@ function header() {
   const units = h('select', { 'aria-label': 'Unit system', onchange: (e) => setUnits(e.target.value) }, h('option', { value: 'metric' }, 'SI / metric'), h('option', { value: 'imperial' }, 'Imperial'));
   units.value = settings.units;
   const menuBtn = h('button', { class: 'menu-btn', type: 'button', 'aria-label': 'Menu', onclick: () => document.body.classList.toggle('nav-open') }, '☰');
-  const save = h('button', { class: 'btn small', type: 'button', onclick: () => { const n = prompt('Project name', app.lastName || 'MachinaSim project'); if (n) { app.lastName = n; app.saveProject(n); } } }, 'Save');
+  const save = h('button', { class: 'btn small', type: 'button', onclick: () => { const n = prompt('Project name', app.lastName || 'MachinaSim project'); if (n) { app.lastName = n; app.saveProject(n).then(() => app.pages.home?.show?.()); } } }, 'Save');
   const exp = h('button', { class: 'btn small', type: 'button', onclick: () => { const d = app.serializeProject(app.lastName || 'project'); download(`${(app.lastName || 'project').replace(/\W+/g, '_')}.machinasim.json`, JSON.stringify(d), 'application/json'); } }, 'Export');
   const imp = h('button', { class: 'btn small', type: 'button', onclick: async () => { const f = await pickFile('.json'); if (!f) return; try { await app.restoreProject(JSON.parse(await f.text())); } catch (e) { toast(e.message, 'error'); } } }, 'Import');
   return h('header', { class: 'top' }, menuBtn, h('a', { class: 'brand', href: '#/home' }, h('span', { class: 'logo' }, 'M'), h('span', {}, 'MachinaSim'), h('span', { class: 'ver' }, `v${VERSION}`)), nav, h('div', { class: 'top-right' }, save, exp, imp, units));

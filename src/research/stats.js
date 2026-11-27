@@ -17,6 +17,61 @@ export function errorMetrics(y, p) {
   return { n, MAE: sa / n, RMSE: Math.sqrt(ss / n), MAPE: np ? (100 * sp) / np : NaN, R2: sst > 0 ? 1 - ss / sst : NaN, bias: (p.slice(0, n).reduce((s, x) => s + x, 0) - y.slice(0, n).reduce((s, x) => s + x, 0)) / n };
 }
 
+
+// ---------------- Confidence intervals ----------------
+
+function lnGamma(x) {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let y = x, tmp = x + 5.5; tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (const ci of c) ser += ci / ++y;
+  return -tmp + Math.log((2.5066282746310005 * ser) / x);
+}
+function betacf(a, b, x) {
+  const FPMIN = 1e-300; let qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - (qab * x) / qap;
+  if (Math.abs(d) < FPMIN) d = FPMIN; d = 1 / d; let hh = d;
+  for (let m = 1; m <= 300; m++) {
+    const m2 = 2 * m;
+    let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN; d = 1 / d; hh *= d * c;
+    aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN; c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN; d = 1 / d;
+    const del = d * c; hh *= del; if (Math.abs(del - 1) < 3e-14) break;
+  }
+  return hh;
+}
+/** Regularised incomplete beta function I_x(a, b). */
+export function betaInc(x, a, b) {
+  if (x <= 0) return 0; if (x >= 1) return 1;
+  const bt = Math.exp(lnGamma(a + b) - lnGamma(a) - lnGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2) ? (bt * betacf(a, b, x)) / a : 1 - (bt * betacf(b, a, 1 - x)) / b;
+}
+/** Student-t cumulative distribution function. */
+export function tCDF(t, dof) {
+  const p = 0.5 * betaInc(dof / (dof + t * t), dof / 2, 0.5);
+  return t >= 0 ? 1 - p : p;
+}
+/** Student-t quantile (inverse CDF), by bisection; tQuantile(0.975, dof) is the two-sided 95 % factor. */
+export function tQuantile(p, dof) {
+  if (!(dof > 0) || !(p > 0 && p < 1)) return NaN;
+  let lo = -1e3, hi = 1e3;
+  for (let i = 0; i < 200; i++) { const mid = 0.5 * (lo + hi); if (tCDF(mid, dof) < p) lo = mid; else hi = mid; }
+  return 0.5 * (lo + hi);
+}
+/** Symmetric interval est ± t·se; null when no degrees of freedom remain. */
+function ciSym(est, se, t) { return Number.isFinite(se) && Number.isFinite(t) ? [est - t * se, est + t * se] : null; }
+/** Interval for exp(lnEst) from an interval on the log scale (asymmetric). */
+function ciExp(lnEst, se, t) { const c = ciSym(lnEst, se, t); return c ? [Math.exp(c[0]), Math.exp(c[1])] : null; }
+/** Residual records; z is the residual on the scale the regression was fitted on (log scale for power laws), used for outlier screening. */
+function residuals(x, obs, pred, z = null) { return obs.map((y, i) => ({ x: x[i], obs: y, pred: pred[i], res: y - pred[i], z: z ? z[i] : y - pred[i] })); }
+/** Indices of points whose fit-space residual exceeds k·s, s = √(Σz²/dof). */
+export function outliers(fit, k = 2.5) {
+  const r = fit?.residuals; if (!r?.length || !(fit.dof > 0)) return [];
+  const s = Math.sqrt(r.reduce((a, q) => a + q.z * q.z, 0) / fit.dof);
+  return s > 0 ? r.map((q, i) => (Math.abs(q.z) > k * s ? i : -1)).filter((i) => i >= 0) : [];
+}
+const CI_LEVEL = 0.95;
+
 /** Solve A x = b (Gaussian elimination with partial pivoting). A is array of rows. */
 export function solve(A, b) {
   const n = A.length;
@@ -46,21 +101,22 @@ export function ols(X, y) {
   const m = errorMetrics(y, yhat);
   const dof = X.length - p;
   const sse = y.reduce((s, yi, i) => s + (yi - yhat[i]) ** 2, 0);
-  let se = null;
+  let se = null, cov = null;
   if (dof > 0) {
     const s2 = sse / dof;
     try {
       const inv = XtX.map((_, i) => solve(XtX, XtX.map((__, j) => (i === j ? 1 : 0))));
+      cov = inv.map((col) => col.map((v) => s2 * v));
       se = inv.map((col, i) => Math.sqrt(Math.max(0, s2 * col[i])));
-    } catch { se = null; }
+    } catch { se = null; cov = null; }
   }
-  return { beta, yhat, R2: m.R2, RMSE: m.RMSE, dof, se };
+  return { beta, yhat, R2: m.R2, RMSE: m.RMSE, dof, se, cov };
 }
 
 /** Linear regression y = a + b x */
 export function linreg(x, y) {
   const r = ols(x.map((v) => [1, v]), y);
-  return { a: r.beta[0], b: r.beta[1], R2: r.R2, se: r.se };
+  return { a: r.beta[0], b: r.beta[1], R2: r.R2, se: r.se, cov: r.cov, dof: r.dof };
 }
 
 /**
@@ -71,7 +127,13 @@ export function fitKienzle(rows) {
   const ok = rows.filter((r) => r.h > 0 && r.b > 0 && r.Fc > 0);
   if (ok.length < 2) throw new Error('Need ≥ 2 valid rows with h, b, Fc > 0');
   const r = linreg(ok.map((d) => Math.log(d.h)), ok.map((d) => Math.log(d.Fc / (d.b * d.h))));
-  return { kc11: Math.exp(r.a), mc: -r.b, R2: r.R2, n: ok.length, seLnKc11: r.se?.[0], seMc: r.se?.[1] };
+  const kc11 = Math.exp(r.a), mc = -r.b, t = tQuantile(0.5 + CI_LEVEL / 2, r.dof);
+  return {
+    kc11, mc, R2: r.R2, n: ok.length, dof: r.dof, seLnKc11: r.se?.[0], seMc: r.se?.[1],
+    ci: { kc11: ciExp(r.a, r.se?.[0], t), mc: ciSym(mc, r.se?.[1], t) },
+    residuals: residuals(ok.map((d) => d.h), ok.map((d) => d.Fc), ok.map((d) => kc11 * d.h ** (1 - mc) * d.b), ok.map((d) => Math.log(d.Fc / (kc11 * d.h ** (1 - mc) * d.b)))),
+    residualLabel: { x: 'h (mm)', y: 'Fc measured − fitted (N)' },
+  };
 }
 
 /** Plain Taylor fit from (V, T): ln V = ln C − n ln T. */
@@ -79,7 +141,13 @@ export function fitTaylor(rows) {
   const ok = rows.filter((r) => r.V > 0 && r.T > 0);
   if (ok.length < 2) throw new Error('Need ≥ 2 rows with V, T > 0');
   const r = linreg(ok.map((d) => Math.log(d.T)), ok.map((d) => Math.log(d.V)));
-  return { C: Math.exp(r.a), n: -r.b, R2: r.R2, n_obs: ok.length };
+  const C = Math.exp(r.a), n = -r.b, t = tQuantile(0.5 + CI_LEVEL / 2, r.dof);
+  return {
+    C, n, R2: r.R2, n_obs: ok.length, dof: r.dof,
+    ci: { C: ciExp(r.a, r.se?.[0], t), n: ciSym(n, r.se?.[1], t) },
+    residuals: residuals(ok.map((d) => d.V), ok.map((d) => d.T), ok.map((d) => (C / d.V) ** (1 / n)), ok.map((d, i) => Math.log(d.V) - r.a - r.b * Math.log(d.T))),
+    residualLabel: { x: 'V (m/min)', y: 'T measured − fitted (min)' },
+  };
 }
 
 /** Extended Taylor fit: ln T = (ln C − ln V − m ln(f/f0) − p ln(ap/ap0))/n via OLS on ln T = a0 + a1 lnV + a2 ln f' + a3 ln ap'. */
@@ -88,8 +156,22 @@ export function fitExtendedTaylor(rows, f0 = 0.25, ap0 = 2) {
   if (ok.length < 4) throw new Error('Need ≥ 4 rows with V, T, f, ap > 0');
   const X = ok.map((d) => [1, Math.log(d.V), Math.log(d.f / f0), Math.log(d.ap / ap0)]);
   const r = ols(X, ok.map((d) => Math.log(d.T)));
-  const n = -1 / r.beta[1];
-  return { n, C: Math.exp(r.beta[0] * n), m: -r.beta[2] * n, p: -r.beta[3] * n, f0, ap0, R2: r.R2 };
+  const [b0, b1, b2, b3] = r.beta;
+  const n = -1 / b1;
+  const out = { n, C: Math.exp(r.beta[0] * n), m: -r.beta[2] * n, p: -r.beta[3] * n, f0, ap0, R2: r.R2, n_obs: ok.length, dof: r.dof, ci: { n: null, C: null, m: null, p: null } };
+  // Delta-method intervals (first-order; approximate for the nonlinear transforms n, C, m, p of the OLS coefficients).
+  if (r.cov && r.dof > 0) {
+    const t = tQuantile(0.5 + CI_LEVEL / 2, r.dof), V = r.cov;
+    const sd = (g) => Math.sqrt(Math.max(0, g.reduce((s1, gi, i) => s1 + g.reduce((s2, gj, j) => s2 + gi * V[i][j] * gj, 0), 0)));
+    out.ci.n = ciSym(n, sd([0, 1 / (b1 * b1), 0, 0]), t);
+    out.ci.C = ciExp(-b0 / b1, sd([-1 / b1, b0 / (b1 * b1), 0, 0]), t);
+    out.ci.m = ciSym(out.m, sd([0, -b2 / (b1 * b1), 1 / b1, 0]), t);
+    out.ci.p = ciSym(out.p, sd([0, -b3 / (b1 * b1), 0, 1 / b1]), t);
+    out.ciMethod = 'delta method (first order)';
+  }
+  out.residuals = residuals(ok.map((d) => d.V), ok.map((d) => d.T), r.yhat.map(Math.exp), ok.map((d, i) => Math.log(d.T) - r.yhat[i]));
+  out.residualLabel = { x: 'V (m/min)', y: 'T measured − fitted (min)' };
+  return out;
 }
 
 /** Least-squares scale calibration of a single multiplicative factor k: minimise Σ(y − k·p)². */
@@ -274,7 +356,13 @@ export function fitLinearEdge(rows) {
   const ok = rows.filter((r) => r.h > 0 && r.b > 0 && Number.isFinite(r.F));
   if (ok.length < 2) throw new Error('Need ≥ 2 rows with h, b, F');
   const r = linreg(ok.map((d) => d.h), ok.map((d) => d.F / d.b));
-  return { Kc: r.b, Ke: r.a, R2: r.R2, n: ok.length };
+  const t = tQuantile(0.5 + CI_LEVEL / 2, r.dof);
+  return {
+    Kc: r.b, Ke: r.a, R2: r.R2, n: ok.length, dof: r.dof,
+    ci: { Kc: ciSym(r.b, r.se?.[1], t), Ke: ciSym(r.a, r.se?.[0], t) },
+    residuals: residuals(ok.map((d) => d.h), ok.map((d) => d.F / d.b), ok.map((d) => r.a + r.b * d.h)),
+    residualLabel: { x: 'h (mm)', y: 'F/b measured − fitted (N/mm)' },
+  };
 }
 
 /** Empirical flank-wear progression VB = VB0 + A·t^B (fit on VB − VB0 > 0), e.g. from microscope series. */
@@ -282,5 +370,11 @@ export function fitWearPower(rows, VB0 = 0) {
   const ok = rows.filter((r) => r.t > 0 && r.VB - VB0 > 0);
   if (ok.length < 2) throw new Error('Need ≥ 2 rows with t > 0 and VB > VB0');
   const r = linreg(ok.map((d) => Math.log(d.t)), ok.map((d) => Math.log(d.VB - VB0)));
-  return { A: Math.exp(r.a), B: r.b, VB0, R2: r.R2, n: ok.length };
+  const A = Math.exp(r.a), B = r.b, t = tQuantile(0.5 + CI_LEVEL / 2, r.dof);
+  return {
+    A, B, VB0, R2: r.R2, n: ok.length, dof: r.dof,
+    ci: { A: ciExp(r.a, r.se?.[0], t), B: ciSym(B, r.se?.[1], t) },
+    residuals: residuals(ok.map((d) => d.t), ok.map((d) => d.VB), ok.map((d) => VB0 + A * d.t ** B), ok.map((d) => Math.log((d.VB - VB0) / (A * d.t ** B)))),
+    residualLabel: { x: 't (min)', y: 'VB measured − fitted (mm)' },
+  };
 }

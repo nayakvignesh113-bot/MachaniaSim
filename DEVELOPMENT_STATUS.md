@@ -1,4 +1,4 @@
-# Development status — v1.1.0 (2026-11-21)
+# Development status — v1.2.0 (2026-11-28)
 
 **Lathe V2 integrated** (see LATHE_V2.md): mechanics, conjugate thermal, multi-mode wear, deflection feedback, time-domain chatter, surface/dimension prediction, chip/temperature 3-D views, workflow and research features. Acceptance test B is now Pass for flank/nose/temperature/force/surface/life; crater/notch need user coefficients.
 
@@ -30,7 +30,7 @@ which only the user can supply (Research → Experiments).
 | 18 | ToolVision | Unit tested · Integrated | Classical CV, no neural network |
 | 19 | Optimisation | Unit tested · Integrated | GA, Pareto, DOE, ANOVA, RSM, Monte Carlo |
 | 20 | Report generation | Integrated | PDF (print), DOCX, XLSX, CSV, JSON |
-| 21 | Database management | Integrated | Browser localStorage + JSON export (not SQLite/PostgreSQL) |
+| 21 | Database management | Integrated | Browser IndexedDB (localStorage fallback) + JSON export (not SQLite/PostgreSQL) |
 
 ## Acceptance tests (spec §29) — demonstrated in a headless browser and/or the automated suite
 
@@ -51,7 +51,7 @@ which only the user can supply (Research → Experiments).
 
 The user asked for browser-based software hosted on GitHub. MachinaSim therefore runs entirely client-side:
 JavaScript ES modules + Three.js; NumPy/SciPy-equivalent numerics are implemented and tested in JS; storage is
-localStorage + JSON files; no FastAPI, PyTorch, SQLite/PostgreSQL or Tauri. OpenCascade.js is not used — the
+IndexedDB + JSON files; no FastAPI, PyTorch, SQLite/PostgreSQL or Tauri. OpenCascade.js is not used — the
 axisymmetric and Z-map representations are exact for the supported operations.
 
 ## Next development stage

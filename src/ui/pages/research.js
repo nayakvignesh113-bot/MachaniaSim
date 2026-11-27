@@ -6,6 +6,7 @@ import { lib, materialSelect } from '../common.js';
 import { materialParams } from '../../core/materials.js';
 import { defaultTaylor } from '../../core/tools.js';
 import { fmt } from '../../core/units.js';
+import { fitView } from '../fitview.js';
 import { parseCSV, toCSV, errorMetrics, fitKienzle, fitTaylor, fitExtendedTaylor, fitScale, fullFactorial, taguchiDesign, anovaMainEffects, fitRSM, paretoFront, geneticAlgorithm, rng, interp, snRatio } from '../../research/stats.js';
 import { turningNominal, theoreticalRoughness } from '../../physics/turning.js';
 import { taylorLife } from '../../physics/wear.js';
@@ -126,7 +127,8 @@ export class ResearchPage {
         const val = rows.filter((r) => r.role === 'val' && r.Fc != null);
         const mv = val.length ? errorMetrics(val.map((r) => r.Fc), val.map((r) => turningNominal({ mat: calMat, tool, V: r.V, f: r.f, ap: r.ap, D: r.D }).Fc)) : null;
         calBox.append(h('h3', {}, 'Kienzle calibration (calibration subset only) ', statusBadge('calibrated')), kv([['kc1.1', `${fmt(k.kc11, 5)} N/mm² (library ${this.mat.kc11})`], ['mc', `${fmt(k.mc, 4)} (library ${this.mat.mc})`], ['fit R² (log-log)', fmt(k.R2, 4)], ['n calibration rows', String(k.n)], ['friction μ from (Ff,Fp)/Fc', muFit != null ? fmt(muFit, 3) : 'needs Ff'], ['Independent validation (Fc)', mv ? `RMSE ${fmt(mv.RMSE, 4)} N, MAPE ${fmt(mv.MAPE, 3)} %, R² ${fmt(mv.R2, 3)} (n=${mv.n})` : 'no validation rows']]),
-          h('button', { class: 'btn', type: 'button', onclick: () => this._saveCalibrated(k, muFit, mv) }, 'Save as calibrated custom material'));
+          h('button', { class: 'btn', type: 'button', onclick: () => this._saveCalibrated(k, muFit, mv) }, 'Save as calibrated custom material'),
+          fitView({ ...k, residualLabel: { x: 'h (mm)', y: 'Fc measured − fitted (N, rake-normalised)' } }, [['kc11', 'kc1.1', 'N/mm²', 5], ['mc', 'mc', '', 4]], 'Kienzle fit residuals'));
       } catch (e) { calBox.append(h('div', { class: 'warn' }, e.message)); }
     }
     const lifeRows = rows.filter((r) => r.T != null && r.role !== 'val');
@@ -134,7 +136,7 @@ export class ResearchPage {
       try {
         const tf = fitTaylor(lifeRows);
         let ext = null; try { ext = lifeRows.length >= 4 ? fitExtendedTaylor(lifeRows) : null; } catch { ext = null; }
-        calBox.append(h('h3', {}, 'Taylor calibration'), kv([['n', fmt(tf.n, 4)], ['C', `${fmt(tf.C, 5)} m/min`], ['R²', fmt(tf.R2, 4)], ['Extended (m, p)', ext ? `n ${fmt(ext.n, 4)}, C ${fmt(ext.C, 5)}, m ${fmt(ext.m, 4)}, p ${fmt(ext.p, 4)}, R² ${fmt(ext.R2, 4)}` : 'needs ≥ 4 rows with varied f, ap']]));
+        calBox.append(h('h3', {}, 'Taylor calibration'), kv([['n', fmt(tf.n, 4)], ['C', `${fmt(tf.C, 5)} m/min`], ['R²', fmt(tf.R2, 4)], ['Extended (m, p)', ext ? `n ${fmt(ext.n, 4)}, C ${fmt(ext.C, 5)}, m ${fmt(ext.m, 4)}, p ${fmt(ext.p, 4)}, R² ${fmt(ext.R2, 4)}` : 'needs ≥ 4 rows with varied f, ap']]), fitView(tf, [['n', 'n', ''], ['C', 'C', 'm/min']], 'Taylor fit residuals'), ...(ext ? [h('h4', {}, 'Extended Taylor'), fitView(ext, [['n', 'n', ''], ['C', 'C', 'm/min'], ['m', 'm (feed)', ''], ['p', 'p (depth)', '']], 'Extended Taylor residuals')] : []));
         this._lastTaylor = ext || tf;
       } catch (e) { calBox.append(h('div', { class: 'warn' }, e.message)); }
     }
