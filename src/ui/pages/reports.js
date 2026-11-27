@@ -6,6 +6,7 @@ import { DocxBuilder } from '../../research/docx.js';
 import { toCSV } from '../../research/stats.js';
 import { settings } from '../dom.js';
 
+/** Generic methodology, used by workspaces that do not supply their own (report().method). */
 const METHOD = 'MachinaSim advances the process one spindle (or cutter) revolution at a time. Each revolution: (1) the tool outline is positioned along the planned path; (2) the engaged leading cutting edge and the removed chip section are computed from the current workpiece geometry; (3) the geometry is updated (exact axisymmetric profile for lathe work, Z-map height field for prismatic work); (4) forces follow from the chip section and engaged edge length via the Kienzle law with rake correction and friction-angle thrust ratio, plus flank-wear-land forces; (5) torque, power and MRR follow from forces, kinematics and the removed volume; (6) reduced-order temperatures and the FD tool field are updated; (7) tool wear advances (Taylor–Miner) and feeds back into forces and tool-nose position.';
 
 export class ReportsPage {
@@ -59,7 +60,7 @@ export class ReportsPage {
       sec(5, 'Machining parameters', r.params?.length ? h('ul', {}, r.params.map((x) => h('li', {}, x))) : h('p', {}, '—')),
       sec(6, 'Mathematical models', table(['ID', 'Model', 'Equation', 'Status'], models.map((m) => [m.id, m.name, m.eq, STATUS_LABEL[m.status]]))),
       sec(7, 'Assumptions', h('ul', {}, models.map((m) => h('li', {}, `${m.id}: ${m.assumptions}`)))),
-      sec(8, 'Calculation methodology', h('p', {}, METHOD)),
+      sec(8, 'Calculation methodology', ...(r.method || [METHOD]).map((x) => h('p', {}, x))),
       sec(9, 'Results (simulated)', kv(r.results)),
       sec(10, 'Graphs', ...imgs.map((i) => h('figure', {}, h('img', { src: i.url, style: { maxWidth: '100%' } }), h('figcaption', {}, i.title)))),
       sec(11, '3-D simulation image', r.snapshot ? h('img', { src: r.snapshot, style: { maxWidth: '100%' } }) : h('p', { class: 'muted' }, 'Not available'), ...(r.images || []).map((u) => h('img', { src: u, style: { maxWidth: '100%' } }))),
@@ -80,7 +81,7 @@ export class ReportsPage {
     d.heading('5. Machining parameters', 2); (r.params?.length ? r.params : ['—']).forEach((x) => d.para(`• ${x}`));
     d.heading('6. Mathematical models', 2).table(['ID', 'Model', 'Equation', 'Status'], models.map((m) => [m.id, m.name, m.eq, STATUS_LABEL[m.status]]));
     d.heading('7. Assumptions', 2); models.forEach((m) => d.para(`• ${m.id}: ${m.assumptions}`));
-    d.heading('8. Calculation methodology', 2).para(METHOD);
+    d.heading('8. Calculation methodology', 2); (r.method || [METHOD]).forEach((x) => d.para(x));
     d.heading('9. Results (simulated)', 2).table(['Quantity', 'Value'], r.results.map(([k, v]) => [k, typeof v === 'string' ? v : v?.textContent ?? String(v)]));
     d.heading('10. Graphs', 2);
     (r.charts || []).forEach((c) => { const u = c.toDataURL(); d.image(u, c.canvas.width / (window.devicePixelRatio || 1), c.canvas.height / (window.devicePixelRatio || 1)).para(c.o.title || '', { italic: true }); });

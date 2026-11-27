@@ -24,5 +24,7 @@ Lathe V2 changes several items below; see LATHE_V2.md for the per-subsystem reco
 - Threads are single-start, constant pitch; the helical rendering maps the θ = 0 section.
 
 ## Software
-- Storage is per browser (localStorage, ~5 MB); use Export for large projects. Unit-system switching converts the lathe inputs and the live readouts; charts, exports and most inputs on other pages stay in SI/metric units.
+- Storage is per browser (IndexedDB; localStorage ~5 MB fallback if IndexedDB is unavailable); clearing site data deletes saved projects — use Export for a portable copy. Unit-system switching converts the lathe inputs and the live readouts; charts, exports and most inputs on other pages stay in SI/metric units.
 - WebGL is required for 3-D views (simulations and results still run without it).
+
+- Calibration confidence intervals assume independent, homoscedastic errors on the fitted (log) scale. They reflect scatter in the data set only, not model-form bias or extrapolation outside the tested range; the extended-Taylor intervals are first-order (delta method).

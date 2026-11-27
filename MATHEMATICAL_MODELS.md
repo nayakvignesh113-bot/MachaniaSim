@@ -1,6 +1,6 @@
 # MachinaSim — Mathematical models
 
-_Generated from `src/core/models.js` (v1.1.0). Do not edit by hand; run `node scripts/gen-docs.mjs`._
+_Generated from `src/core/models.js` (v1.2.0). Do not edit by hand; run `node scripts/gen-docs.mjs`._
 
 Internal units: mm, N, N·m, kW, m/min, rev/min, °C, s (tool life in min). See `src/core/units.js`.
 
@@ -464,15 +464,15 @@ Internal units: mm, N, N·m, kW, m/min, rev/min, °C, s (tool life in min). See 
 
 ## Research
 
-### M-RES-01 — Kienzle / Taylor calibration
+### M-RES-01 — Kienzle / Taylor / edge-force / wear calibration with confidence intervals
 
-- **Equation(s):** `ln kc = ln kc1.1 − mc ln h (OLS); ln V = ln C − n ln T; extended Taylor OLS`
+- **Equation(s):** `ln kc = ln kc1.1 − mc ln h (OLS); ln V = ln C − n ln T; extended Taylor OLS; F/b = Kc·h + Ke; ln(VB − VB0) = ln A + B ln t. Cov(β) = s²(XᵀX)⁻¹, s² = SSE/(n − p); 95 % CI = β ± t(0.975, n − p)·se; exp-transformed and nonlinear parameters (extended Taylor n, C, m, p) by back-transformation / first-order delta method. Outlier screen: |fit-space residual| > 2.5 s`
 - **Variables / inputs:** user data
-- **Assumptions:** Log-normal errors
-- **Validity range:** Data range
+- **Assumptions:** Independent, homoscedastic errors on the fitted (log) scale; intervals reflect scatter in the data only, not model-form bias or extrapolation
+- **Validity range:** Data range; CI undefined when n = p
 - **Status:** Verified against analytical benchmarks
-- **Automated verification:** research.test.js
-- **References:** —
+- **Automated verification:** research.test.js; calibration-ci.test.js (t quantiles vs tables; Monte Carlo coverage ≈ 95 %)
+- **References:** Montgomery & Runger, Applied Statistics and Probability for Engineers (regression inference); Altintas (2012) (edge-force calibration)
 
 ## ToolVision
 

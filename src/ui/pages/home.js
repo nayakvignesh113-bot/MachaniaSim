@@ -32,12 +32,17 @@ export class HomePage {
       h('h2', {}, 'Saved projects (this browser)'), this.recent));
     this.show();
   }
-  show() {
-    const list = this.app.projects();
-    this.recent.replaceChildren(list.length ? h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Saved'), h('th', {}, 'Workspaces'), h('th', {}, ''))),
-      h('tbody', {}, list.map((p) => h('tr', {}, h('td', {}, p.name), h('td', {}, new Date(p.saved).toLocaleString()), h('td', {}, (p.pages || []).join(', ')),
+  async show() {
+    let list = [];
+    try { list = await this.app.projects(); } catch (e) { this.recent.replaceChildren(h('div', { class: 'warn' }, `Project storage unavailable: ${e.message}`)); return; }
+    const kind = await this.app.store.kind().catch(() => '?');
+    const est = await this.app.store.estimate();
+    const info = h('p', { class: 'muted' }, `Stored in ${kind === 'indexeddb' ? 'IndexedDB' : 'localStorage (≈ 5 MB limit)'}${est?.quota ? ` · ${(est.usage / 1e6).toFixed(1)} MB used of ≈ ${(est.quota / 1e9).toFixed(1)} GB available to this site` : ''}${this.app.store.migrated ? ` · ${this.app.store.migrated} project(s) moved from older localStorage storage` : ''}. Use Export for a portable copy.`);
+    const act = (fn) => async () => { try { await fn(); } catch (e) { toast(e.message, 'error'); } this.show(); };
+    this.recent.replaceChildren(list.length ? h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Saved'), h('th', {}, 'Size'), h('th', {}, 'Workspaces'), h('th', {}, ''))),
+      h('tbody', {}, list.map((p) => h('tr', {}, h('td', {}, p.name), h('td', {}, new Date(p.saved).toLocaleString()), h('td', {}, p.size ? `${(p.size / 1e6).toFixed(2)} MB` : '—'), h('td', {}, (p.pages || []).join(', ')),
         h('td', {}, h('button', { class: 'mini', onclick: async () => { try { await this.app.loadProject(p.name); } catch (e) { toast(e.message, 'error'); } } }, 'Load'), ' ',
-          h('button', { class: 'mini', onclick: () => { const d = this.app.serializeProject(p.name); void d; const j = localStorage.getItem(`ms.project.${p.name}`); const c = JSON.parse(j); c.name = `${p.name} (copy)`; localStorage.setItem(`ms.project.${c.name}`, JSON.stringify(c)); const l = this.app.projects(); l.unshift({ ...p, name: c.name }); localStorage.setItem('ms.projects', JSON.stringify(l)); this.show(); } }, 'Duplicate'), ' ',
-          h('button', { class: 'mini', onclick: () => { if (confirm(`Delete “${p.name}”?`)) { this.app.deleteProject(p.name); this.show(); } } }, 'Delete')))))) : h('p', { class: 'muted' }, 'No saved projects yet. Use Save in the header to store the state of all open workspaces.'));
+          h('button', { class: 'mini', onclick: act(() => this.app.duplicateProject(p.name)) }, 'Duplicate'), ' ',
+          h('button', { class: 'mini', onclick: () => { if (confirm(`Delete “${p.name}”?`)) act(() => this.app.deleteProject(p.name))(); } }, 'Delete')))))) : h('p', { class: 'muted' }, 'No saved projects yet. Use Save in the header to store the state of all open workspaces.'), info);
   }
 }
